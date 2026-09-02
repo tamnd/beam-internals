@@ -370,11 +370,227 @@ def modified_timings(tree: Path) -> list[str]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# Reading the wire format out of its own standard
+# ---------------------------------------------------------------------------
+#
+# The three generators above read a C header, because the thing they describe
+# only exists in a C header. The external term format is different: it has a
+# published standard in the OTP tree that other implementations are written
+# from, and that document, not the emulator, is the thing a reimplementation
+# has to agree with. So the tag table is read out of the standard and then
+# checked against the emulator's own defines, and a disagreement between the
+# two fails the build rather than being quietly resolved in favour of either.
+
+EXT_DIST_MD = "erts/doc/guides/erl_ext_dist.md"
+EXTERNAL_H = "erts/emulator/beam/external.h"
+
+# A heading in the standard that names a tag. The parenthetical, when there is
+# one, is the tag's status and the document has no other place that states it.
+TAG_HEADING = re.compile(r"^## ([A-Z][A-Z0-9_]*)(?: \((deprecated|removed)\))?$")
+TABLE_ROW = re.compile(r"^\|(.*)\|$")
+SEPARATOR_ROW = re.compile(r"^\|[\s|:-]+\|$")
+BACKTICKED_NUMBER = re.compile(r"^`(\d+)`$")
+CHAR_DEFINE = re.compile(r"^[ \t]*#[ \t]*define[ \t]+(\w+)[ \t]+'(.)'[ \t]*$", re.MULTILINE)
+IF_ZERO = re.compile(r"^[ \t]*#[ \t]*if[ \t]+0\b")
+ANY_IF = re.compile(r"^[ \t]*#[ \t]*if")
+ANY_ENDIF = re.compile(r"^[ \t]*#[ \t]*endif\b")
+
+# Tags the emulator defines and the standard does not describe under a heading
+# of its own. Each one is here because leaving it out of a specification would
+# be a hole rather than a simplification, so the list is checked and a new one
+# upstream stops the build.
+UNDOCUMENTED_MEANING = {
+    "DIST_HEADER": (
+        "Opens a distribution message and carries the atom cache. The standard "
+        "describes it under a heading that names the header rather than the tag."
+    ),
+    "DIST_FRAG_HEADER": "Opens the first fragment of a message too large to send in one piece.",
+    "DIST_FRAG_CONT": "Opens every fragment after the first.",
+    "HOPEFUL_DATA": (
+        "Wraps an encoding that used a tag the far end may not understand, with a fallback beside it."
+    ),
+    "ATOM_INTERNAL_REF2": (
+        "An atom by its index in this VM's atom table, two bytes. Valid inside one runtime instance only."
+    ),
+    "ATOM_INTERNAL_REF3": (
+        "An atom by its index in this VM's atom table, three bytes. Valid inside one runtime instance only."
+    ),
+    "BINARY_INTERNAL_REF": (
+        "A pointer to an existing off heap binary, so a term can move between processes without a copy."
+    ),
+    "BITSTRING_INTERNAL_REF": (
+        "A pointer to an existing bitstring that is not a whole number of bytes, again without a copy."
+    ),
+    "MAGIC_REF_INTERNAL_REF": (
+        "A pointer to a magic reference, which is a handle on a resource and has no wire form at all."
+    ),
+    "COMPRESSED": (
+        "Says the next four bytes are the uncompressed size and the rest is zlib. The standard "
+        "describes it in its opening section, with no heading of its own."
+    ),
+}
+
+
+def strip_if_zero(text: str) -> str:
+    """Drop `#if 0` blocks.
+
+    This is not a preprocessor and does not want to be. `#if 0` is the one
+    directive worth handling, because a define inside one is dead code that
+    still matches every pattern a define matches, and `external.h` has two of
+    them sitting on values that would otherwise read as live tags.
+    """
+    out: list[str] = []
+    dead_at: int | None = None
+    depth = 0
+    for line in text.splitlines():
+        if dead_at is None:
+            if IF_ZERO.match(line):
+                dead_at, depth = 0, 0
+                continue
+            out.append(line)
+            continue
+        if ANY_IF.match(line):
+            depth += 1
+        elif ANY_ENDIF.match(line):
+            if depth == 0:
+                dead_at = None
+                continue
+            depth -= 1
+    if dead_at is not None:
+        raise Unreadable("an #if 0 block is never closed")
+    return "\n".join(out)
+
+
+def cells(line: str) -> list[str]:
+    return [c.strip() for c in TABLE_ROW.match(line).group(1).split("|")]
+
+
+def first_table(lines: list[str], start: int) -> tuple[list[str], list[str]]:
+    """The widths row and the first body row of the table after `start`.
+
+    Every tag in the standard is drawn the same way: a header row of field
+    widths in bytes, a separator, then one row of field names with the tag's
+    own value in the first cell. Reading both rows is what turns the table into
+    a layout rather than a number.
+    """
+    for index in range(start, min(start + 12, len(lines))):
+        if not SEPARATOR_ROW.match(lines[index]):
+            continue
+        widths = cells(lines[index - 1])
+        fields = cells(lines[index + 1])
+        if len(widths) != len(fields):
+            raise Unreadable(f"line {index + 2}: {len(widths)} widths against {len(fields)} fields")
+        return widths, fields
+    raise Unreadable(f"no table within twelve lines of line {start}")
+
+
+def read_standard(tree: Path) -> dict[str, dict]:
+    """Every tag the standard gives a heading to, with its value and layout."""
+    lines = (tree / EXT_DIST_MD).read_text(encoding="utf-8").splitlines()
+    found: dict[str, dict] = {}
+    for index, line in enumerate(lines):
+        heading = TAG_HEADING.match(line)
+        if not heading:
+            continue
+        name, status = heading.group(1), heading.group(2)
+        widths, fields = first_table(lines, index + 1)
+        number = BACKTICKED_NUMBER.match(fields[0])
+        if not number:
+            # A heading in capitals that is prose rather than a tag, such as
+            # ATOM_CACHE_REF's neighbours in the distribution header section.
+            continue
+        found[name] = {
+            "value": int(number.group(1)),
+            "layout": list(zip(widths[1:], fields[1:], strict=True)),
+            "status": status or "current",
+        }
+    if not found:
+        raise Unreadable(f"{EXT_DIST_MD} parsed to no tags")
+    return found
+
+
+def read_emulator_tags(tree: Path) -> dict[str, int]:
+    text = strip_if_zero(strip_comments((tree / EXTERNAL_H).read_text(encoding="utf-8")))
+    return {name: ord(char) for name, char in CHAR_DEFINE.findall(text)}
+
+
+def layout_of(pairs: list[tuple[str, str]]) -> str:
+    """Turn one row of the standard's tables into a sentence.
+
+    Three shapes have to survive this. A tag with no fields at all, where the
+    row is one cell wide. A field whose width the standard leaves blank,
+    because it is a term and its length is its own business. And `LOCAL_EXT`,
+    whose whole payload is an ellipsis on purpose, since the standard declines
+    to say what follows it.
+    """
+    if not pairs:
+        return "nothing follows"
+    if all(width == "..." or field == "..." for width, field in pairs):
+        return "the standard does not say"
+    parts = [field if width in {"", "..."} else f"{field} {width}" for width, field in pairs]
+    return ", ".join(parts)
+
+
+def etf_tags(tree: Path) -> list[str]:
+    """The tag table, read from the standard and checked against the emulator."""
+    standard = read_standard(tree)
+    emulator = read_emulator_tags(tree)
+
+    disagree = [
+        f"{name} is {spec['value']} in the standard and {emulator[name]} in the emulator"
+        for name, spec in standard.items()
+        if name in emulator and emulator[name] != spec["value"]
+    ]
+    absent = sorted(name for name in standard if name not in emulator)
+    if disagree or absent:
+        raise Unreadable(
+            "the standard and the emulator do not agree: "
+            + "; ".join([*disagree, *[f"{n} is documented and not defined" for n in absent]])
+        )
+
+    rows = []
+    for name, spec in sorted(standard.items(), key=lambda item: item[1]["value"]):
+        rows.append([str(spec["value"]), f"`{name}`", layout_of(spec["layout"]), spec["status"]])
+    return [
+        f"Read from `{EXT_DIST_MD}` and checked against `{EXTERNAL_H}`. "
+        f"{len(rows)} tags. Widths are in bytes, `N` means a whole encoded term "
+        f"and `Len` or `Arity` means the field named earlier on the row.",
+        "",
+        *table(["Value", "Tag", "What follows the tag byte", "Status"], rows),
+    ]
+
+
+def etf_undocumented_tags(tree: Path) -> list[str]:
+    """Tags the emulator defines that the standard gives no heading to."""
+    standard = read_standard(tree)
+    emulator = read_emulator_tags(tree)
+    found = {name for name in emulator if name not in standard}
+    unknown = found - set(UNDOCUMENTED_MEANING)
+    missing = set(UNDOCUMENTED_MEANING) - found
+    if unknown or missing:
+        raise Unreadable(
+            f"the undocumented tag list moved: added {sorted(unknown)}, gone {sorted(missing)}. "
+            "Update UNDOCUMENTED_MEANING in tools/bpc.py rather than the blueprint."
+        )
+    rows = [
+        [str(emulator[name]), f"`{name}`", UNDOCUMENTED_MEANING[name]]
+        for name in sorted(found, key=lambda n: emulator[n])
+    ]
+    return [
+        f"Defined in `{EXTERNAL_H}` with no heading of their own in the standard. {len(rows)} of them.",
+        "",
+        *table(["Value", "Name", "What it is for"], rows),
+    ]
+
+
 GENERATORS = {
     "primary-tags": (primary_tags, TERM_H),
     "immediate-tags": (immediate_tags, TERM_H),
     "header-subtags": (header_subtags, TERM_H),
     "modified-timings": (modified_timings, f"{INIT_C} and {VM_H}"),
+    "etf-tags": (etf_tags, f"{EXT_DIST_MD} and {EXTERNAL_H}"),
+    "etf-undocumented-tags": (etf_undocumented_tags, f"{EXT_DIST_MD} and {EXTERNAL_H}"),
 }
 
 
