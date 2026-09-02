@@ -57,31 +57,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # The submodule is the whole Erlang/OTP tree at the pinned tag, so this is
+      # the slow job. It is shallow and it only ever needs one commit, which
+      # takes it from several minutes down to under one.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           persist-credentials: false
           submodules: recursive
+          fetch-depth: 1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # The submodule is the whole OTP tree at the pinned tag and lands in M0.
-      # Until it does there is nothing to resolve against, so this step reports
-      # that and the job stays green. Once .gitmodules exists the strict run
-      # takes over and a citation pointing at a line that is not there fails.
-      - name: Is the pinned tree available
-        id: pinned
+      - name: The submodule is at the commit the pin names
         run: |
-          if [ -f .gitmodules ]; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "No submodule yet, so only the shape of each citation is checked."
+          pinned=$(python -c "import tomllib,pathlib; print(tomllib.loads(pathlib.Path('refcheck.toml').read_text())['pin']['commit'])")
+          actual=$(git -C otp rev-parse HEAD)
+          if [ "$pinned" != "$actual" ]; then
+            echo "refcheck.toml says $pinned, the submodule is at $actual"
+            exit 1
           fi
+          echo "Both agree on $pinned"
 
       - name: Every path and line number exists at the pin
-        if: steps.pinned.outputs.present == 'true'
         run: python -m tools.refcheck --strict
 
   tools:

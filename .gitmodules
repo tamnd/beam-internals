@@ -1,0 +1,4 @@
+[submodule "otp"]
+	path = otp
+	url = https://github.com/erlang/otp.git
+	shallow = true

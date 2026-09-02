@@ -96,6 +96,8 @@ MkDocs Material, with `mike` giving one published version per OTP minor. `site/_
 
 A git submodule pinned to a tag and a commit, `OTP-29.0.5` at `5cf5f9725452f4e1b6a4890e8ff0305d76924b98`. A tag alone is mutable and a commit alone loses the human readable version, so both get recorded. Every citation in this repository is of the form `path:line@OTP-29.0.5` and is resolved against this submodule by `refcheck`.
 
+Run `just pin` to fetch it. It is about 400 MB and you only need it to run `just citations-strict`, so a prose change does not require it. CI checks that the commit in the submodule and the commit in `refcheck.toml` are the same, because a pin that says one thing and points at another is worse than no pin.
+
 ## What is not here
 
 Build output, kernel or emulator artefacts, rendered animations, the site build, and anything a tool can regenerate. Scratch traces go in `scratch/`, which is ignored. Anything a lesson depends on goes in `corpora/` instead, committed, so the build stays reproducible.
