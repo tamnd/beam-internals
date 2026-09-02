@@ -284,3 +284,185 @@ def test_generated_output_is_a_markdown_table() -> None:
 
 def test_bits_pads_to_the_width_of_the_tag() -> None:
     assert bpc.bits(0x3, 6) == "000011"
+
+
+# ---------------------------------------------------------------------------
+# The external term format, read out of its own standard
+# ---------------------------------------------------------------------------
+
+# A cut down erl_ext_dist.md with every table shape the real one has: an
+# ordinary tag, a tag with no fields, a tag whose field widths are left blank
+# because they are whole terms, a tag whose payload the standard declines to
+# describe, a deprecated one, a removed one, and a heading in capitals that is
+# not a tag at all.
+STANDARD = """
+## Introduction
+
+Prose.
+
+## SMALL_INTEGER_EXT
+
+| 1    | 1     |
+| ---- | ----- |
+| `97` | `Int` |
+
+Unsigned 8-bit integer.
+
+## NIL_EXT
+
+| 1     |
+| ----- |
+| `106` |
+
+The empty list.
+
+## LIST_EXT
+
+| 1     | 4        |            |        |
+| ----- | -------- | ---------- | ------ |
+| `108` | `Length` | `Elements` | `Tail` |
+
+A list.
+
+## LOCAL_EXT
+
+| 1     | ... |
+| ----- | --- |
+| `121` | ... |
+
+Anything at all.
+
+## ATOM_EXT (deprecated)
+
+| 1     | 2     | Len        |
+| ----- | ----- | ---------- |
+| `100` | `Len` | `AtomName` |
+
+An atom in latin1.
+
+## FUN_EXT (removed)
+
+| 1     | 4         |
+| ----- | --------- |
+| `117` | `NumFree` |
+
+Gone.
+"""
+
+EXTERNAL_H = """
+#define SMALL_INTEGER_EXT 'a'
+#define NIL_EXT           'j'
+#define LIST_EXT          'l'
+#define LOCAL_EXT         'y'
+#define ATOM_EXT          'd'
+#define FUN_EXT           'u'
+
+#define COMPRESSED        'P'
+
+#if 0
+/* Not used anymore */
+#define CACHED_ATOM       'C'
+#endif
+
+#define VERSION_MAGIC 131
+"""
+
+
+def wire_tree(tmp_path: Path, standard: str = STANDARD, header: str = EXTERNAL_H) -> Path:
+    tree = tmp_path / "otp"
+    (tree / "erts" / "doc" / "guides").mkdir(parents=True)
+    (tree / "erts" / "emulator" / "beam").mkdir(parents=True)
+    (tree / "erts" / "doc" / "guides" / "erl_ext_dist.md").write_text(standard, encoding="utf-8")
+    (tree / "erts" / "emulator" / "beam" / "external.h").write_text(header, encoding="utf-8")
+    return tree
+
+
+def test_every_tag_in_the_standard_is_read_with_its_value(tmp_path: Path) -> None:
+    tags = bpc.read_standard(wire_tree(tmp_path))
+
+    assert tags["SMALL_INTEGER_EXT"]["value"] == 97
+    assert tags["LIST_EXT"]["value"] == 108
+    assert set(tags) == {
+        "SMALL_INTEGER_EXT",
+        "NIL_EXT",
+        "LIST_EXT",
+        "LOCAL_EXT",
+        "ATOM_EXT",
+        "FUN_EXT",
+    }
+
+
+def test_a_heading_in_capitals_with_no_table_of_values_is_not_a_tag(tmp_path: Path) -> None:
+    # "Introduction" is a heading and not a tag, and the difference is that the
+    # first cell of its table is not a number. There is no list of exceptions.
+    assert "Introduction" not in bpc.read_standard(wire_tree(tmp_path))
+
+
+def test_the_parenthetical_in_a_heading_is_the_status(tmp_path: Path) -> None:
+    tags = bpc.read_standard(wire_tree(tmp_path))
+
+    assert tags["ATOM_EXT"]["status"] == "deprecated"
+    assert tags["FUN_EXT"]["status"] == "removed"
+    assert tags["SMALL_INTEGER_EXT"]["status"] == "current"
+
+
+@pytest.mark.parametrize(
+    ("tag", "expected"),
+    [
+        ("SMALL_INTEGER_EXT", "`Int` 1"),
+        ("NIL_EXT", "nothing follows"),
+        ("LIST_EXT", "`Length` 4, `Elements`, `Tail`"),
+        ("LOCAL_EXT", "the standard does not say"),
+    ],
+)
+def test_the_field_table_becomes_a_layout(tmp_path: Path, tag: str, expected: str) -> None:
+    tags = bpc.read_standard(wire_tree(tmp_path))
+
+    assert bpc.layout_of(tags[tag]["layout"]) == expected
+
+
+def test_a_define_inside_if_zero_is_not_a_tag(tmp_path: Path) -> None:
+    # CACHED_ATOM is dead code in external.h and its value would otherwise read
+    # as a live tag, which is the whole reason strip_if_zero exists.
+    assert "CACHED_ATOM" not in bpc.read_emulator_tags(wire_tree(tmp_path))
+
+
+def test_a_char_define_becomes_the_byte_it_encodes(tmp_path: Path) -> None:
+    assert bpc.read_emulator_tags(wire_tree(tmp_path))["SMALL_INTEGER_EXT"] == 97
+
+
+def test_the_standard_and_the_emulator_disagreeing_is_a_failure(tmp_path: Path) -> None:
+    # This is the point of reading both. A tag renumbered on one side and not
+    # the other is the kind of change that would otherwise be invisible.
+    tree = wire_tree(tmp_path, header=EXTERNAL_H.replace("SMALL_INTEGER_EXT 'a'", "SMALL_INTEGER_EXT 'b'"))
+
+    with pytest.raises(bpc.Unreadable, match="SMALL_INTEGER_EXT is 97 in the standard and 98"):
+        bpc.etf_tags(tree)
+
+
+def test_a_documented_tag_the_emulator_does_not_define_is_a_failure(tmp_path: Path) -> None:
+    tree = wire_tree(tmp_path, header=EXTERNAL_H.replace("#define NIL_EXT           'j'\n", ""))
+
+    with pytest.raises(bpc.Unreadable, match="NIL_EXT is documented and not defined"):
+        bpc.etf_tags(tree)
+
+
+def test_the_tag_table_is_ordered_by_value(tmp_path: Path) -> None:
+    # The standard is ordered by nothing in particular, and a specification that
+    # a person reads while holding a byte in their hand wants the byte order.
+    rendered = bpc.etf_tags(wire_tree(tmp_path))
+    values = [
+        int(line.split("|")[1].strip())
+        for line in rendered
+        if line.startswith("|") and line.split("|")[1].strip().isdigit()
+    ]
+
+    assert values == [97, 100, 106, 108, 117, 121]
+
+
+def test_a_tag_the_emulator_has_and_the_standard_lacks_needs_a_sentence(tmp_path: Path) -> None:
+    # The values come from the header and cannot drift. The sentences do not
+    # exist in the header, so a new tag upstream has to stop the build rather
+    # than appear in a specification with an empty explanation.
+    with pytest.raises(bpc.Unreadable, match="the undocumented tag list moved"):
+        bpc.etf_undocumented_tags(wire_tree(tmp_path))

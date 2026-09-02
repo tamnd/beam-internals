@@ -21,8 +21,11 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 *.egg-info/
-dist/
-build/
+# Anchored to the repository root on purpose. Unanchored these match any
+# directory of that name at any depth, and blueprints/dist/ is a real source
+# directory that an unanchored rule swallows without saying anything.
+/dist/
+/build/
 
 # Node, for the gateway tests
 node_modules/

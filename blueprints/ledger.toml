@@ -253,7 +253,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-DIST-0001"
 text = "Every term on the external format begins with the version byte 131 followed by one tag byte, and that tag byte alone decides how the rest of the bytes are read."
-where = ["m55", "BP-DIST-001#1"]
+where = ["m55", "BP-DIST-001#2"]
 evidence = "observed"
 by = [
   "cell:m55/wire",
@@ -360,7 +360,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-DIST-0009"
 text = "Decoding bytes you did not write creates any atom named in them, permanently, unless the safe option is passed, and once the atom exists the same bytes are accepted under safe as well."
-where = ["m55", "BP-DIST-001#6"]
+where = ["m55", "BP-DIST-001#5"]
 evidence = "observed"
 by = [
   "cell:m55/untrusted",
@@ -372,7 +372,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-DIST-0010"
 text = "Bytes assembled by hand decode into a working pid for a node this runtime has never spoken to, and two such pids differing only in the creation field are not equal even though they report the same node."
-where = ["m55", "BP-DIST-001#6"]
+where = ["m55", "BP-DIST-001#2"]
 evidence = "observed"
 by = [
   "cell:m55/handmade",
