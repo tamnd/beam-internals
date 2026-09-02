@@ -12,7 +12,7 @@ Issues labelled `good first issue` are real work with a clear finish line. Issue
 
 **A claim needs evidence.** Any sentence that asserts the BEAM does something is a claim, and every claim gets an entry in `blueprints/ledger.toml` naming what backs it. The classes, strongest first, are: a cell in this repository that CI runs, a proof from Concuerror or PropEr or TLA+ or Coq, a quote from an upstream normative document, a concurrency claim backed by runs alone, and source reading with no runtime evidence. The last two are capped at two and three per lesson. The caps are the point. They force you to find an observation or admit the gap.
 
-**A citation needs a version.** Write `erts/emulator/beam/erl_vm.h:53@OTP-29.0.5`. A line number with no tag is noise within a year. `refcheck` resolves it against the pinned submodule and compares a hash of the surrounding lines against what was there when somebody last read them.
+**A citation needs a version.** Write `erts/emulator/beam/erl_vm.h:53@OTP-29.0.5`. A line number with no tag is noise within a year. A macro or an algorithm is rarely one line, so a range is allowed and spelled `erts/emulator/beam/bif.h:71-78@OTP-29.0.5`, up to the limit in `refcheck.toml`, which is forty lines because needing more than that means the lesson is two lessons. `refcheck` resolves it against the pinned submodule and compares a hash of the surrounding lines against what was there when somebody last read them.
 
 **Do not cite generated files.** Citing `beam_hot.h` instead of `ops.tab` is a common mistake and the checker knows the generated file list. Cite the table, not the thing the table produced.
 

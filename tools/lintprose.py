@@ -43,9 +43,14 @@ SKIP_DIRS = {
 
 # Words that tell a reader the problem is them, plus one that is simply untrue.
 # "it turns out" did not turn out. Somebody decided, and there is a commit.
+#
+# "just" carries an exception for "just in time", which is the name of the
+# compiler this book spends most of its pages on. Spelling it JIT everywhere to
+# get past a linter would make the book harder to read than the rule it is
+# working around, and an author who hits this once works around it forever.
 BANNED = [
     r"\bsimply\b",
-    r"\bjust\b",
+    r"\bjust\b(?! in time)",
     r"\bobviously\b",
     r"\bof course\b",
     r"\btrivially\b",
@@ -57,8 +62,14 @@ BANNED = [
 
 # A citation into the Erlang/OTP tree has to carry the tag it was read at. A
 # line number with no version is noise within a year.
+#
+# The line part may be one number or a range, because a macro or an algorithm is
+# rarely one line, and `refcheck` has read the range form since it was written.
+# A checker that accepts a narrower spelling than the resolver does sends the
+# author looking for a mistake that is not there.
 CITATION = re.compile(
-    r"\b((?:erts|lib|system|make)/[\w./+-]+\.(?:c|h|cpp|hpp|erl|hrl|tab|md|names|types|tla)):(\d+)"
+    r"\b((?:erts|lib|system|make)/[\w./+-]+\.(?:c|h|cpp|hpp|erl|hrl|tab|md|names|types|tla))"
+    r":(\d+(?:-\d+)?)"
 )
 TAGGED = re.compile(r"@OTP-\d")
 

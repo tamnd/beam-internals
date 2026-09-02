@@ -108,3 +108,25 @@ def test_the_staged_site_copies_are_skipped(tmp_path: Path) -> None:
     staged.mkdir(parents=True)
     (staged / "index.md").write_text("# Home\n", encoding="utf-8")
     assert lintprose.prose_files(tmp_path) == []
+
+
+def test_a_citation_naming_a_line_range_passes(tmp_path: Path) -> None:
+    # refcheck has always read the range form, so the style checker rejecting
+    # it sent authors hunting for a mistake that was not in their prose.
+    text = "The clamp is `erts/emulator/beam/bif.h:71-78@OTP-29.0.5` and it never goes negative.\n"
+    assert not fired(rules(tmp_path, text), "citation-without-tag")
+
+
+def test_a_citation_naming_a_line_range_without_a_tag_is_rejected(tmp_path: Path) -> None:
+    text = "The clamp is erts/emulator/beam/bif.h:71-78 and it never goes negative.\n"
+    assert fired(rules(tmp_path, text), "citation-without-tag")
+
+
+def test_just_in_time_is_allowed(tmp_path: Path) -> None:
+    text = "The just in time compiler charges a reduction at every function entry.\n"
+    assert not fired(rules(tmp_path, text), "banned-word")
+
+
+def test_just_on_its_own_is_still_rejected(tmp_path: Path) -> None:
+    text = "You just read the table and the answer is there.\n"
+    assert fired(rules(tmp_path, text), "banned-word")
