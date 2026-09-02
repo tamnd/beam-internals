@@ -63,3 +63,5 @@ nav:
   - Layout: layout.md
   - Contributing: contributing.md
   - Blueprint notation: notation.md
+  - Lessons:
+      - t07: lessons/t07/index.md

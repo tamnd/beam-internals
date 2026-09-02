@@ -1,0 +1,1 @@
+an empty function costs 5 reductions

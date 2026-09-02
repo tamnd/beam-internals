@@ -1,0 +1,8 @@
+100000 elements, on jit
+
+total/1    you said 0, the VM charged 100002 for 100000 elements, which is 1.0 each  not this time
+size/1     you said 0, the VM charged 200001 for 100000 elements, which is 2.0 each  not this time
+
+Not yet. Look at where the recursive call sits in each clause.
+If it is the last thing the clause does, the frame is gone and there is no return to pay for.
+If something is waiting to happen after it, the call has to come back, and coming back costs one.
