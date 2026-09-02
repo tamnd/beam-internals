@@ -26,7 +26,9 @@ CITATION = re.compile(
     r":(\d+)(?:-(\d+))?@(OTP-[\w.]+)"
 )
 
-SKIP_DIRS = {".git", ".venv", "node_modules", "_build", "otp", "__pycache__"}
+# site/ holds copies that `sitebuild` staged, so counting it would double every
+# citation and report each problem in it twice.
+SKIP_DIRS = {".git", ".venv", "node_modules", "_build", "site", "otp", "__pycache__"}
 
 
 @dataclass
@@ -44,10 +46,22 @@ def load_config(root: Path) -> dict:
         return tomllib.load(handle)
 
 
+def prose_files(root: Path) -> list[Path]:
+    """Every markdown file under root, including Livebook notebooks.
+
+    Lessons cite the tree more than anything else does, and a lesson is a
+    `.livemd`, so a checker that only reads `.md` would check the least of it.
+    """
+    found: list[Path] = []
+    for pattern in ("*.md", "*.livemd"):
+        found.extend(root.rglob(pattern))
+    return sorted(found)
+
+
 def collect(roots: list[Path]) -> list[Citation]:
     found: list[Citation] = []
     for root in roots:
-        files = [root] if root.is_file() else sorted(root.rglob("*.md"))
+        files = [root] if root.is_file() else prose_files(root)
         for path in files:
             if any(part in SKIP_DIRS for part in path.parts):
                 continue

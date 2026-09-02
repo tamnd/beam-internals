@@ -28,7 +28,7 @@ Issues labelled `good first issue` are real work with a clear finish line. Issue
 
 ## House style
 
-`tools/lintprose` checks these on every push, so you do not have to remember them.
+`tools/lintprose` checks these on every push, so you do not have to remember them. It reads `.md` and `.livemd`, so the rules apply to a lesson exactly as they apply to a blueprint.
 
 Second person, present tense, active voice. You spawn a process, it gets a 233 word heap.
 

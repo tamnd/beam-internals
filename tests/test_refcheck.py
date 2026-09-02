@@ -55,3 +55,17 @@ def test_the_pin_is_a_tag_and_a_commit() -> None:
     pin = refcheck.load_config(Path("."))["pin"]
     assert pin["tag"].startswith("OTP-")
     assert len(pin["commit"]) == 40
+
+
+def test_notebooks_are_collected(tmp_path: Path) -> None:
+    (tmp_path / "lesson.livemd").write_text(
+        "The budget is `erts/emulator/beam/erl_vm.h:53@OTP-29.0.5`.\n", encoding="utf-8"
+    )
+    found = refcheck.collect([tmp_path])
+    assert [c.path for c in found] == ["erts/emulator/beam/erl_vm.h"]
+
+
+def test_a_jit_citation_is_read(tmp_path: Path) -> None:
+    found = cite(tmp_path, "See `erts/emulator/beam/jit/x86/instr_call.cpp:70@OTP-29.0.5`.\n")
+    assert found[0].path == "erts/emulator/beam/jit/x86/instr_call.cpp"
+    assert found[0].start == 70
