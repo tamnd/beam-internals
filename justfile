@@ -7,7 +7,7 @@ set shell := ["bash", "-uc"]
 # The full set, same order as ci.yml
 default: check
 
-check: prose ledger blueprints citations site-check
+check: prose ledger blueprints bpc-check citations site-check
     @echo "all checks passed"
 
 # House style. Catches the em dash, the banned words, sentences wrapped across
@@ -23,6 +23,15 @@ ledger:
 blueprints:
     python3 -m tools.bplint
 
+# Regenerate the blueprint regions that come from the VM's own tables. Needs the
+# pinned tree, and does nothing without it.
+bpc:
+    python3 -m tools.bpc
+
+# Same, but compares instead of writing, so a hand edited region fails.
+bpc-check:
+    python3 -m tools.bpc --check
+
 # Citation shape, and resolution when the pinned tree is checked out.
 citations:
     python3 -m tools.refcheck
@@ -30,6 +39,11 @@ citations:
 # Same, but fails when the pinned tree is missing rather than skipping.
 citations-strict:
     python3 -m tools.refcheck --strict
+
+# Both of the gates that need the pinned tree, which is what the deep CI job
+# runs. Run `just pin` first.
+deep: citations-strict
+    python3 -m tools.bpc --check --strict
 
 # Stage the book into the site directory and regenerate the navigation.
 site-stage:
