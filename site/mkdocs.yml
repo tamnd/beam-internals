@@ -65,3 +65,5 @@ nav:
   - Blueprint notation: notation.md
   - Lessons:
       - t07: lessons/t07/index.md
+  - Blueprints:
+      - BP-SCHED-001: blueprints/BP-SCHED-001.md
