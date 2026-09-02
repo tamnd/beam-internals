@@ -159,7 +159,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0003"
 text = "An integer in range, an atom of any name length, a pid, a port and the empty list all cost zero heap words, because the term is the machine word and there is nothing left to store anywhere else."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#2"]
 evidence = "observed"
 by = [
   "cell:m02/sizes",
@@ -173,7 +173,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0004"
 text = "On a 64 bit build the integers that cost no heap are exactly -576460752303423488 through 576460752303423487, a span of two to the sixtieth, which is the word width minus the four bit immediate tag."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#2"]
 evidence = "observed"
 by = [
   "cell:m02/bisect",
@@ -186,7 +186,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0005"
 text = "A tuple of n elements costs n plus one heap words and a list of n elements costs 2n, so the two are equal at one element and the list is never cheaper again."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#2"]
 evidence = "observed"
 by = [
   "cell:m02/shapes",
@@ -198,7 +198,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0006"
 text = "A bitstring of up to 64 bytes is copied onto the process heap and one of 65 bytes or more is not, so a 65 byte binary costs 8 heap words while a 64 byte binary costs 10, and the cost stops growing entirely past the limit."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#2"]
 evidence = "observed"
 by = [
   "cell:m02/threshold",
@@ -213,7 +213,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0007"
 text = "There is exactly one empty tuple in the VM, a global literal held outside every process heap, so an empty tuple costs zero words however it was built and stays free when it is sent to another process."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#4"]
 evidence = "observed"
 by = [
   "cell:m02/empty",
@@ -227,7 +227,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0008"
 text = "The empty list sorts above every tuple and every map and below any list with an element in it, because the type numbers put nil between list and map and the comparison subtracts them in the other direction."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#4"]
 evidence = "observed"
 by = [
   "cell:m02/order",
@@ -240,7 +240,7 @@ by_whom = "tamnd"
 [[claim]]
 id = "CLM-TERM-0009"
 text = "The reason a zero arity tuple is a global literal is not the one word it saves. It is that the emulator has an optimisation which reads the word after a tuple's arity word without checking there is one, so an arity zero tuple must never sit on a heap."
-where = ["m02"]
+where = ["m02", "BP-TERM-001#5"]
 # Source reading and nothing more. The comment states the reason, and a reason
 # is not a behaviour, so there is no cell that could demonstrate it. Reading the
 # optimisation itself would move this to unobservable with a second citation
