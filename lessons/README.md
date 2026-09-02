@@ -12,7 +12,7 @@ lessons/07-scheduling/m34/
   meta.toml          id, title, part, env, duration, deps, blueprint, boss
   boss.exs           the boss fight grader
   expected/          committed output, one file per cell, written by `just bake`
-  assets/            figures and helper modules for this lesson only
+  files/             figures and helper modules, under the name Livebook uses
 ```
 
 `lesson.livemd` opens in Livebook Desktop with none of this repository present. Nothing in the build pipeline is needed to read or run a lesson, which is why the format was chosen.

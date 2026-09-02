@@ -31,6 +31,23 @@ def collect() -> tuple[list[Path], list[Path]]:
     return lessons, blueprints
 
 
+def stage_assets(lesson: Path, target: Path) -> None:
+    """Copy a lesson's attached files in alongside its page.
+
+    `files/` is Livebook's own name for the things a notebook refers to, and a
+    notebook writes them as `files/x.svg`. Keeping that name and staging the
+    page as `lessons/<id>/index.md` rather than as a flat `lessons/<id>.md`
+    means the same relative path resolves in Livebook Desktop and on the
+    published site. The alternative is rewriting image paths on the way in,
+    which would leave the page and the notebook holding different text, and the
+    whole reason for choosing this format is that they hold the same text.
+    """
+    source = lesson / "files"
+    if not source.is_dir():
+        return
+    shutil.copytree(source, target / "files", dirs_exist_ok=True)
+
+
 def navigation(lessons: list[Path], blueprints: list[Path]) -> str:
     lines = ["", "nav:"]
     for name, _, title in TOP:
@@ -39,7 +56,7 @@ def navigation(lessons: list[Path], blueprints: list[Path]) -> str:
     if lessons:
         lines.append("  - Lessons:")
         for path in lessons:
-            lines.append(f"      - {path.parent.name}: lessons/{path.parent.name}.md")
+            lines.append(f"      - {path.parent.name}: lessons/{path.parent.name}/index.md")
 
     if blueprints:
         lines.append("  - Blueprints:")
@@ -69,7 +86,10 @@ def build(check: bool) -> int:
         out = DOCS / "lessons"
         out.mkdir(exist_ok=True)
         for path in lessons:
-            shutil.copyfile(path, out / f"{path.parent.name}.md")
+            page = out / path.parent.name
+            page.mkdir(exist_ok=True)
+            shutil.copyfile(path, page / "index.md")
+            stage_assets(path.parent, page)
 
     if blueprints:
         out = DOCS / "blueprints"
