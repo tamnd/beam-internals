@@ -5,6 +5,10 @@ remember them and no reviewer has to spend attention on them. Standard library
 only, so it runs in under a second and a prose change gets an answer straight
 away.
 
+Both `.md` and `.livemd` are checked. A Livebook notebook is markdown with code
+cells in it, and the lessons are the prose that matters most here, so leaving
+them out would mean the rules apply everywhere except where they are needed.
+
 Run: python3 -m tools.lintprose [path ...]
 """
 
@@ -20,7 +24,7 @@ SKIP_DIRS = {
     ".venv",
     "node_modules",
     "_build",
-    "site/_build",
+    "site",
     "otp",
     "__pycache__",
     ".pytest_cache",
@@ -31,6 +35,11 @@ SKIP_DIRS = {
 # corpora/ is not skipped. Only markdown is checked, and the recorded output in
 # there is not markdown, so the only thing this reaches is the prose explaining
 # a corpus, which is prose like any other.
+#
+# site/ is skipped in full. Every markdown file under it is a copy that
+# `sitebuild` put there, so linting it means reporting each problem twice and
+# reporting relative links as dead because they were resolved from a different
+# directory.
 
 # Words that tell a reader the problem is them, plus one that is simply untrue.
 # "it turns out" did not turn out. Somebody decided, and there is a commit.
@@ -48,7 +57,9 @@ BANNED = [
 
 # A citation into the Erlang/OTP tree has to carry the tag it was read at. A
 # line number with no version is noise within a year.
-CITATION = re.compile(r"\b((?:erts|lib|system|make)/[\w./+-]+\.(?:c|h|erl|hrl|tab|md|names|types|tla)):(\d+)")
+CITATION = re.compile(
+    r"\b((?:erts|lib|system|make)/[\w./+-]+\.(?:c|h|cpp|hpp|erl|hrl|tab|md|names|types|tla)):(\d+)"
+)
 TAGGED = re.compile(r"@OTP-\d")
 
 # Colour and position carry no information for a reader who cannot see the
@@ -143,6 +154,17 @@ def check(path: Path) -> list[Problem]:
     return problems
 
 
+def prose_files(root: Path) -> list[Path]:
+    """Every markdown file under root, including Livebook notebooks."""
+    found: list[Path] = []
+    for pattern in ("*.md", "*.livemd"):
+        for path in root.rglob(pattern):
+            if any(part in SKIP_DIRS for part in path.parts):
+                continue
+            found.append(path)
+    return sorted(found)
+
+
 def targets(argv: list[str]) -> list[Path]:
     roots = [Path(a) for a in argv] or [Path(".")]
     found: list[Path] = []
@@ -150,10 +172,7 @@ def targets(argv: list[str]) -> list[Path]:
         if root.is_file():
             found.append(root)
             continue
-        for path in sorted(root.rglob("*.md")):
-            if any(part in SKIP_DIRS for part in path.parts):
-                continue
-            found.append(path)
+        found.extend(prose_files(root))
     return found
 
 

@@ -81,3 +81,30 @@ def test_trailing_whitespace_is_rejected(tmp_path: Path) -> None:
 def test_allow_directive_suppresses_a_rule(tmp_path: Path) -> None:
     text = "<!-- lintprose: allow banned-word -->\nThe paper calls this obviously correct.\n"
     assert not fired(rules(tmp_path, text), "banned-word")
+
+
+def test_a_cpp_citation_without_a_tag_is_rejected(tmp_path: Path) -> None:
+    # The reduction counter is decremented in the JIT, which is C++, so the
+    # pattern has to reach .cpp and .hpp as well as .c and .h.
+    text = "The counter drops in erts/emulator/beam/jit/x86/instr_call.cpp:70 on every return.\n"
+    assert fired(rules(tmp_path, text), "citation-without-tag")
+
+
+def test_livebook_notebooks_are_collected(tmp_path: Path) -> None:
+    (tmp_path / "lesson.livemd").write_text("# t07\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("# Readme\n", encoding="utf-8")
+    names = {path.name for path in lintprose.prose_files(tmp_path)}
+    assert names == {"lesson.livemd", "README.md"}
+
+
+def test_rules_apply_inside_a_notebook(tmp_path: Path) -> None:
+    path = tmp_path / "lesson.livemd"
+    path.write_text("The scheduler counts reductions — not milliseconds.\n", encoding="utf-8")
+    assert fired([problem.rule for problem in lintprose.check(path)], "em-dash")
+
+
+def test_the_staged_site_copies_are_skipped(tmp_path: Path) -> None:
+    staged = tmp_path / "site" / "docs"
+    staged.mkdir(parents=True)
+    (staged / "index.md").write_text("# Home\n", encoding="utf-8")
+    assert lintprose.prose_files(tmp_path) == []
