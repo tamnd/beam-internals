@@ -27,6 +27,11 @@ __pycache__/
 /dist/
 /build/
 
+# Manim's default output directory, for when somebody runs it by hand instead
+# of through tools/figures.py. Anchored, like the two above, because an
+# unanchored rule would swallow any directory called media at any depth.
+/media/
+
 # Node, for the gateway tests
 node_modules/
 *.tsbuildinfo

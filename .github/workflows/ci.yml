@@ -135,6 +135,47 @@ jobs:
       - name: Every case in every suite
         run: ./conformance/run.escript
 
+  animations:
+    name: animations still render
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      # Manim draws text through Pango, draws everything else through Cairo, and
+      # writes video through ffmpeg. Pycairo has no wheel here, so it compiles,
+      # which is why the Cairo headers and pkg-config are in this list. Leaving
+      # them out fails during pip install rather than during the render, with an
+      # error about a missing `icc` that has nothing to do with the real cause.
+      - name: System libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            pkg-config libcairo2-dev libpango1.0-dev ffmpeg
+
+      - name: Install
+        run: python -m pip install -e ".[anim]"
+
+      # This renders and throws the result away. It does not compare the output
+      # to the committed still, because two machines with different fonts draw
+      # the same scene differently and the comparison would fail for a reason
+      # nobody cares about. What it catches is a scene that stopped building at
+      # all, which is what happens when the vocabulary changes under one.
+      #
+      # So a still can still go stale without CI noticing. Keeping it current is
+      # on whoever edits the scene, and the reason to run this job anyway is
+      # that a scene which no longer builds cannot be brought current at all.
+      - name: Every scene builds and produces a still
+        run: python -m tools.figures --still-only
+
   workflows:
     name: workflow lint
     runs-on: ubuntu-latest

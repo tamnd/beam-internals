@@ -234,6 +234,14 @@ Read the shape rather than the hex. Two bits for the common case, and you only p
 
 The figure is drawn in Excalidraw and the source is next to it, at `files/term-word.excalidraw`, so you can open it and change it rather than reverse engineering an image.
 
+That gives you the answer. What it does not give you is the order the bits arrive in, and the order is the reason the widths come out uneven.
+
+![A table of three rows and five columns. The columns are the term, the result of masking with 0x3, the result of masking with 0xF, the result of masking with 0x3F, and what is left of the word. A pointer to a cons cell reads 01 LIST at the first mask and stops there, keeping 62 bits of address. A small integer reads 11 IMMED1 at the first mask and 1111 SMALL at the second, then stops, keeping 60 bits of signed value. An atom reads 11 IMMED1, then 1011 IMMED2, then 001011 ATOM, and keeps 58 bits of index into the atom table. Under the table the three tags are drawn as bit cells, two for the cons pointer, four for the small integer and six for the atom, labelled 2 bits spent and 62 kept, 4 bits spent and 60 kept, and 6 bits spent and 58 kept.](files/tag-doors.png)
+
+Every term is masked with `0x3` first, and three of the four answers are finished at that point. Only `IMMED1` reads further, and only one of its four answers reads further again. A tag is six bits wide because the emulator opened three doors to reach it, not because somebody decided that atoms deserved six.
+
+There is a moving version of this figure that walks one word down all three doors and then replays the two shorter walks. It is rendered from `bxmanim/m02_tag_doors.py` by `just anim m02_tag_doors`, and the video itself is not committed, because a diff of an mp4 tells a reviewer nothing.
+
 ## The boxed side, and why lists are not tuples
 
 `LIST` having a primary tag of its own is the part that looks like waste. Four states is not many, and one of them went to a single data structure.
