@@ -62,6 +62,15 @@ Every field in section 2 is classified as normative, incidental or debug only. G
 
 Every ordering guarantee in section 4 needs at least one line saying what is not guaranteed. A guarantee with no stated boundary is where distributed Erlang bugs come from.
 
+**Do not hand write a table the VM already has.** Tag values, subtag values and the `+T` slice table are generated. Mark the region and let `bpc` fill it:
+
+```
+<!-- bpc: primary-tags -->
+<!-- bpc: end primary-tags -->
+```
+
+Run `just bpc` to fill it and `just bpc-check` to compare, which is what CI does with the pinned tree checked out. Editing inside a region fails the build, including editing the sentences, because those live in `tools/bpc.py` next to the numbers they describe. If a generator cannot read its table any more, fix the generator. Pasting the numbers in is how the table goes stale without anybody finding out.
+
 ## Pull requests
 
 One lesson, one blueprint or one tool per pull request. Run `just check` first, which is what CI runs.

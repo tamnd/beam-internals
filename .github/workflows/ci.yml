@@ -83,6 +83,12 @@ jobs:
       - name: Every path and line number exists at the pin
         run: python -m tools.refcheck --strict
 
+      # A generated region is only worth having if nobody can edit it and get
+      # away with it. This regenerates every one of them from the tree at the
+      # pin and fails on the diff.
+      - name: Generated blueprint regions match the tables they come from
+        run: python -m tools.bpc --check --strict
+
   tools:
     name: tools lint and tests
     runs-on: ubuntu-latest
