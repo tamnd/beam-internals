@@ -1,0 +1,585 @@
+# m02 What a term costs
+
+## Before you start
+
+You need an Erlang/OTP 29 install and Livebook. Nothing else. No emulator build, no repository checkout, no root.
+
+This lesson takes about thirty minutes. It was written and measured against Erlang/OTP 29 erts-17.0.5 on aarch64 macOS and on x86-64 Linux, both on the JIT, and every recorded number below came out the same on both.
+
+One thing here does depend on your machine, and it is the important one, so run this cell first.
+
+<!-- cell: banner -->
+
+```elixir
+IO.puts(:erlang.system_info(:system_version))
+
+IO.puts("otp release   #{:erlang.system_info(:otp_release)}")
+IO.puts("word size     #{:erlang.system_info(:wordsize) * 8} bit")
+IO.puts("flavor        #{:erlang.system_info(:emu_flavor)}")
+```
+
+If the word size says 64 you are where this lesson was written and every number below should match yours exactly. If it says 32 the shapes all still hold and two of the constants are different, and there is a section at the end that says which ones and why.
+
+## The question
+
+You are about to put a million records in an ETS table, or send a million messages, or hold a million somethings in a process. You want to know how much memory that is going to be.
+
+So you need to know what one of them costs. Not roughly. Exactly, in words, because a word is what the BEAM allocates in and a factor of two here is the difference between a machine that fits and a machine that does not.
+
+The BEAM will tell you. `erts_debug:flat_size/1` takes any term and returns the number of heap words it occupies. It is in the emulator, it needs no build flags, and it has been there for decades.
+
+The interesting part is not the function. It is that the answers do not look like the answers you would guess.
+
+## Predict before you run
+
+Write these down somewhere you will see them again in ten minutes, not in your head.
+
+**One.** How many heap words does the integer `42` cost? How about `9999999999999999999999`?
+
+**Two.** A binary of 64 bytes, and a binary of 65 bytes. Which costs more heap words, and by how much?
+
+**Three.** Sort this list: `[[], {}, %{}, [:a]]`. Which comes first, and which comes last?
+
+Now measure.
+
+## Sizes, measured
+
+One call per shape. Nothing here is computed, every number is what the VM said when it was asked.
+
+<!-- cell: sizes -->
+
+```elixir
+words = &:erts_debug.flat_size/1
+
+row = fn label, term ->
+  IO.puts("#{String.pad_trailing(label, 24)}#{String.pad_leading(to_string(words.(term)), 3)}")
+end
+
+IO.puts("term                    words")
+row.("0", 0)
+row.("42", 42)
+row.("-1", -1)
+row.(":ok", :ok)
+row.(":a_longer_atom_here", :a_longer_atom_here)
+row.("[]", [])
+row.("{}", {})
+row.("self()", self())
+row.("3.14", 3.14)
+row.("0.0", 0.0)
+row.("make_ref()", make_ref())
+row.("fn x -> x end", fn x -> x end)
+row.("{:a}", {:a})
+row.("{:a, :b}", {:a, :b})
+row.("{:a, :b, :c}", {:a, :b, :c})
+row.("[:a]", [:a])
+row.("[:a, :b]", [:a, :b])
+row.("[:a, :b, :c]", [:a, :b, :c])
+row.("%{}", %{})
+row.("%{a: 1}", %{a: 1})
+row.("<<>>", <<>>)
+row.("<<1, 2, 3>>", <<1, 2, 3>>)
+```
+
+```
+term                    words
+0                         0
+42                        0
+-1                        0
+:ok                       0
+:a_longer_atom_here       0
+[]                        0
+{}                        0
+self()                    0
+3.14                      2
+0.0                       2
+make_ref()                3
+fn x -> x end             2
+{:a}                      2
+{:a, :b}                  3
+{:a, :b, :c}              4
+[:a]                      2
+[:a, :b]                  4
+[:a, :b, :c]              6
+%{}                       3
+%{a: 1}                   6
+<<>>                      2
+<<1, 2, 3>>               3
+```
+
+Eight of those are zero. An integer costs nothing, an atom costs nothing however long its name is, a pid costs nothing, the empty list costs nothing, and the empty tuple costs nothing.
+
+Zero is not a rounding down. It means the term does not live on the process heap at all. Every Erlang value is one machine word, and for seven of those eight the word itself is the whole value, so there is nothing left over to store anywhere. A variable holding `42` holds the number. A variable holding `{:a, :b}` holds an address, and the two words at the other end of that address are what shows up as a cost.
+
+The eighth is `{}`, which is zero for an entirely different reason, and it gets its own section further down.
+
+That split has a name. A term that fits in its own word is **immediate**. A term that needs an address is **boxed**. Everything in this lesson comes out of that one distinction.
+
+`3.14` costing 2 is the same rule from the other side. A double needs all 64 bits, and the word is already spent saying what kind of thing this is, so a float goes on the heap with a header word in front of it. There is no NaN boxing here and no special case for `0.0`. Every float costs two.
+
+## How many integers fit
+
+An integer being free is convenient right up until you find the edge. The obvious question is where it is, and the wrong way to answer it is to look up a constant and believe it.
+
+This cell finds the edge by asking the VM about one candidate at a time. It doubles until an integer stops being free, then bisects.
+
+<!-- cell: bisect -->
+
+```elixir
+words = &:erts_debug.flat_size/1
+free? = fn n -> words.(n) == 0 end
+
+# Double until an integer stops being free, then bisect between the last free
+# one and the first boxed one. Nothing here knows the answer in advance. It only
+# ever asks the VM about one candidate at a time.
+boundary = fn sign ->
+  bad = Stream.iterate(1, &(&1 * 2)) |> Enum.find(&(not free?.(sign * &1)))
+
+  {good, _} =
+    Enum.reduce_while(1..100, {div(bad, 2), bad}, fn _, {g, b} ->
+      mid = div(g + b, 2)
+
+      cond do
+        mid == g -> {:halt, {g, b}}
+        free?.(sign * mid) -> {:cont, {mid, b}}
+        true -> {:cont, {g, mid}}
+      end
+    end)
+
+  sign * good
+end
+
+biggest = boundary.(1)
+smallest = boundary.(-1)
+
+IO.puts("largest free integer   #{biggest}")
+IO.puts("smallest free integer  #{smallest}")
+IO.puts("one past the top       #{biggest + 1} costs #{words.(biggest + 1)} words")
+IO.puts("one past the bottom    #{smallest - 1} costs #{words.(smallest - 1)} words")
+IO.puts("")
+IO.puts("the free range holds   #{biggest - smallest + 1} values")
+IO.puts("which is two to the    #{trunc(:math.log2(biggest - smallest + 1))}")
+IO.puts("and a word is          #{:erlang.system_info(:wordsize) * 8} bits")
+```
+
+```
+largest free integer   576460752303423487
+smallest free integer  -576460752303423488
+one past the top       576460752303423488 costs 2 words
+one past the bottom    -576460752303423489 costs 2 words
+
+the free range holds   1152921504606846976 values
+which is two to the    60
+and a word is          64 bits
+```
+
+Sixty bits of integer in a sixty four bit word. Four bits went somewhere, and the emulator says where in one line.
+
+```c
+#define SMALL_BITS	(64-4)
+```
+
+That is `erts/emulator/beam/erl_term.h:263@OTP-29.0.5`, and the bounds two lines below it are the numbers the cell found.
+
+```c
+#define MAX_SMALL	((SWORD_CONSTANT(1) << (SMALL_BITS-1))-1)
+#define MIN_SMALL	(-(SWORD_CONSTANT(1) << (SMALL_BITS-1)))
+```
+
+`erts/emulator/beam/erl_term.h:269-270@OTP-29.0.5`. Two to the fifty nine minus one, and minus two to the fifty nine. The bisection found both without being told either.
+
+The name for an integer in that range is a **small**. Outside it you get a **big**, which is boxed, which is why the two values one step past the edge cost two words each. Nothing about your program changes when you cross that line. The arithmetic keeps working, the results stay exact, and the allocation behaviour changes completely.
+
+## Where the four bits went
+
+Two of them are spent first, on every term in the system.
+
+```c
+#define _TAG_PRIMARY_SIZE	2
+#define _TAG_PRIMARY_MASK	0x3
+#define TAG_PRIMARY_HEADER	0x0
+#define TAG_PRIMARY_LIST	0x1
+#define TAG_PRIMARY_BOXED	0x2
+#define TAG_PRIMARY_IMMED1	0x3
+```
+
+`erts/emulator/beam/erl_term.h:70-75@OTP-29.0.5`. Four states in two bits, and every operation in the emulator that has to know what it is holding starts by masking with `0x3`.
+
+Three of the four are enough to tell the whole story. `BOXED` means the rest of the word is an address and there is a header at the other end. `LIST` means the rest of the word is an address too, and there is no header at the other end, only two words, a head and a tail. `HEADER` is not a term at all, it is the word a boxed term points at, and it says which kind of boxed thing this is and how big.
+
+The fourth, `IMMED1`, means the value is right here, and only that branch spends more bits.
+
+```c
+#define _TAG_IMMED1_SIZE	4
+#define _TAG_IMMED1_MASK	0xF
+#define _TAG_IMMED1_PID		((0x0 << _TAG_PRIMARY_SIZE) | TAG_PRIMARY_IMMED1)
+#define _TAG_IMMED1_PORT	((0x1 << _TAG_PRIMARY_SIZE) | TAG_PRIMARY_IMMED1)
+#define _TAG_IMMED1_IMMED2	((0x2 << _TAG_PRIMARY_SIZE) | TAG_PRIMARY_IMMED1)
+#define _TAG_IMMED1_SMALL	((0x3 << _TAG_PRIMARY_SIZE) | TAG_PRIMARY_IMMED1)
+```
+
+`erts/emulator/beam/erl_term.h:79-84@OTP-29.0.5`. Four bits, four kinds, and one of the four is another door. Behind it, six bits.
+
+```c
+#define _TAG_IMMED2_SIZE	6
+#define _TAG_IMMED2_ATOM	((0x0 << _TAG_IMMED1_SIZE) | _TAG_IMMED1_IMMED2)
+#define _TAG_IMMED2_CATCH	((0x1 << _TAG_IMMED1_SIZE) | _TAG_IMMED1_IMMED2)
+#define _TAG_IMMED2_NIL		((0x3 << _TAG_IMMED1_SIZE) | _TAG_IMMED1_IMMED2)
+```
+
+`erts/emulator/beam/erl_term.h:86-90@OTP-29.0.5`.
+
+Read the shape rather than the hex. Two bits for the common case, and you only pay for more when the extra bits buy you something. A small integer is the kind most sensitive to width, so it stops at four bits and keeps sixty. An atom is an index into a table and never needed sixty bits, so it can afford to spend six. The empty list needs no payload whatsoever, because there is exactly one of it, so it is nothing but a tag.
+
+![Six rows, one per kind of term. Each row is a wide bar for the payload with small square cells at its right end holding the tag bits. A header on the heap ends in 00, a pointer to a cons cell ends in 01, a pointer to a boxed term ends in 10, a small integer ends in 1111 with sixty bits of value in front, an atom ends in 001011 and holds an index into the atom table, and the empty list ends in 111011 with no payload at all.](files/term-word.svg)
+
+The figure is drawn in Excalidraw and the source is next to it, at `files/term-word.excalidraw`, so you can open it and change it rather than reverse engineering an image.
+
+## The boxed side, and why lists are not tuples
+
+`LIST` having a primary tag of its own is the part that looks like waste. Four states is not many, and one of them went to a single data structure.
+
+Measure what that bought.
+
+<!-- cell: shapes -->
+
+```elixir
+words = &:erts_debug.flat_size/1
+
+IO.puts("elements   tuple   list")
+
+for n <- 0..6 do
+  elements = List.duplicate(:a, n)
+  tuple = List.to_tuple(elements)
+
+  IO.puts(
+    String.pad_leading(to_string(n), 8) <>
+      String.pad_leading(to_string(words.(tuple)), 8) <>
+      String.pad_leading(to_string(words.(elements)), 7)
+  )
+end
+
+IO.puts("")
+IO.puts("a tuple of n costs n + 1 words, a list of n costs 2n")
+IO.puts("except at n = 0, where the tuple costs 0 rather than 1")
+```
+
+```
+elements   tuple   list
+       0       0      0
+       1       2      2
+       2       3      4
+       3       4      6
+       4       5      8
+       5       6     10
+       6       7     12
+
+a tuple of n costs n + 1 words, a list of n costs 2n
+except at n = 0, where the tuple costs 0 rather than 1
+```
+
+A tuple is a header word saying how many, then the elements. A list is a chain of two word cells, each holding an element and the address of the next one. At three elements the list costs half again as much, at six it costs almost twice, and the gap keeps widening.
+
+That is what the primary tag bought. A cons cell has no header, because the tag on the pointer already said what is at the other end, so a list cell is two words rather than three. Spending a quarter of the primary tag space on lists is a fifty percent saving on the most common data structure in the language, paid once in the tag layout instead of once per cell.
+
+The line to remember is not the arithmetic. It is that a list of n is 2n words and a tuple of n is n plus one, and if you are holding a million of something and you reach for a list out of habit, that habit costs eight megabytes.
+
+## The binary that gets cheaper as it grows
+
+Here is the one that catches people. Scan a binary across sizes and watch what happens.
+
+<!-- cell: threshold -->
+
+```elixir
+words = &:erts_debug.flat_size/1
+
+IO.puts("bytes   words")
+
+for n <- [0, 1, 8, 32, 62, 63, 64, 65, 66, 128, 4096] do
+  bin = :binary.copy(<<0>>, n)
+  IO.puts(String.pad_leading(to_string(n), 5) <> String.pad_leading(to_string(words.(bin)), 8))
+end
+
+edge =
+  Enum.find(1..1024, fn n ->
+    words.(:binary.copy(<<0>>, n)) > words.(:binary.copy(<<0>>, n + 1))
+  end)
+
+IO.puts("")
+IO.puts("the size stops growing after #{edge} bytes")
+IO.puts("and #{edge + 1} bytes costs less than #{edge} bytes")
+```
+
+```
+bytes   words
+    0       2
+    1       3
+    8       3
+   32       6
+   62      10
+   63      10
+   64      10
+   65       8
+   66       8
+  128       8
+ 4096       8
+
+the size stops growing after 64 bytes
+and 65 bytes costs less than 64 bytes
+```
+
+Sixty five bytes costs eight words. Sixty four bytes costs ten. Adding a byte made the term smaller, and then four kilobytes costs the same eight words as sixty five bytes did.
+
+The constant is one line.
+
+```c
+/* Maximum number of bytes/bits to place in a heap binary.*/
+#define ERL_ONHEAP_BINARY_LIMIT 64
+```
+
+`erts/emulator/beam/erl_bits.h:167@OTP-29.0.5`. Up to and including 64 bytes, the bytes are copied onto the process heap behind a header, which is two words of overhead plus one word per eight bytes. Sixty four bytes is eight words of data plus two of header, and that is the ten.
+
+Past the limit the data goes into a separate allocation that is reference counted, and what sits on the process heap is a fixed size pair of objects, a reference to that allocation and a view onto part of it. Those are `ERL_BIN_REF_SIZE` and `ERL_SUB_BITS_SIZE` at `erts/emulator/beam/erl_bits.h:144@OTP-29.0.5` and `erts/emulator/beam/erl_bits.h:128@OTP-29.0.5`, and together they are the eight words that four kilobytes costs.
+
+Two consequences worth carrying out of here.
+
+The first is that eight words is what the *process heap* pays, and the four kilobytes are still allocated, somewhere else, counted against the whole node rather than one process. `flat_size` is answering a narrow question honestly. When you are chasing memory, a small process holding large binaries looks small, and it is not.
+
+The second is the reason large binaries are cheap to pass around. Sending a big binary to another process copies eight words and bumps a counter, not four kilobytes. Sending a 64 byte one copies all of it, every time. The crossover is not where anyone's intuition puts it.
+
+## The one empty tuple
+
+Go back to the shapes cell. A tuple of n costs n plus one everywhere except zero, where the rule says one word and the VM says none.
+
+<!-- cell: empty -->
+
+```elixir
+words = &:erts_debug.flat_size/1
+
+built_at_runtime = List.to_tuple([])
+made_by_a_bif = :erlang.make_tuple(0, :x)
+written_in_the_source = {}
+came_back_from_a_process = (fn -> {} end).()
+
+IO.puts("literal in this cell      #{words.(written_in_the_source)} words")
+IO.puts("built from a list         #{words.(built_at_runtime)} words")
+IO.puts("built by make_tuple/2     #{words.(made_by_a_bif)} words")
+IO.puts("returned from a call      #{words.(came_back_from_a_process)} words")
+IO.puts("")
+
+IO.puts("all four are equal        #{written_in_the_source == built_at_runtime}")
+IO.puts("and identical             #{written_in_the_source === made_by_a_bif}")
+
+# Two empty tuples built by completely different routes. If they are the same
+# object then copying one into another process cannot allocate anything.
+parent = self()
+spawn(fn -> send(parent, {:from_another_heap, {}}) end)
+
+receive do
+  {:from_another_heap, t} ->
+    IO.puts("sent from another heap    #{words.(t)} words")
+end
+
+IO.puts("")
+IO.puts("a one element tuple, for contrast, costs #{words.({:a})} words")
+```
+
+```
+literal in this cell      0 words
+built from a list         0 words
+built by make_tuple/2     0 words
+returned from a call      0 words
+
+all four are equal        true
+and identical             true
+sent from another heap    0 words
+
+a one element tuple, for contrast, costs 2 words
+```
+
+Four different ways to make an empty tuple and none of them allocated anything, including the one that crossed a process boundary. There is exactly one empty tuple in the VM, it lives outside every process heap, and every `{}` in every process is the same object.
+
+```c
+extern Eterm ERTS_GLOBAL_LIT_EMPTY_TUPLE;
+#define TUPLE0 ERTS_GLOBAL_LIT_EMPTY_TUPLE
+```
+
+`erts/emulator/beam/erl_term.h:545-546@OTP-29.0.5`, with the declaration also at `erts/emulator/beam/erl_global_literals.h:38@OTP-29.0.5`.
+
+The reason is not the word. Saving one word on a value nobody stores a million of would not be worth a global. The comment above the declaration says what it is actually for.
+
+```c
+  Due to an optimization that assumes that the word after the arity
+  word is allocated, one should generally not create tuples of arity
+  zero on heaps.
+```
+
+`erts/emulator/beam/erl_term.h:540-543@OTP-29.0.5`. Somewhere in the emulator there is code that reads the word after a tuple's arity word without checking that the tuple has any elements, and it is faster for it to be allowed to. Rather than make that code check, the VM makes sure a zero arity tuple is never on a heap in the first place, so the word after it is always a real allocated word belonging to the literal area.
+
+You can see the rule this created in a predicate near the top of the same file.
+
+```c
+#define is_zero_sized(x)        (is_immed(x) || (x) == ERTS_GLOBAL_LIT_EMPTY_TUPLE)
+```
+
+`erts/emulator/beam/erl_term.h:190@OTP-29.0.5`. Costs nothing means immediate, or the one specific term that is the exception. That `||` is a design decision with a date on it, and it is the kind of thing that never appears in documentation.
+
+## Sorting, and a table that runs backwards
+
+Third prediction. Sort a list holding one of everything.
+
+<!-- cell: order -->
+
+```elixir
+mixed = [
+  {:a, :b},
+  [:a],
+  <<1>>,
+  7,
+  3.14,
+  :an_atom,
+  [],
+  %{a: 1},
+  self(),
+  make_ref(),
+  fn -> :ok end,
+  # Any node running Livebook has ports open, and any port will do here.
+  hd(:erlang.ports())
+]
+
+label = fn
+  t when is_float(t) -> "float"
+  t when is_integer(t) -> "integer"
+  t when is_atom(t) and t != [] -> "atom"
+  t when is_reference(t) -> "reference"
+  t when is_function(t) -> "fun"
+  t when is_port(t) -> "port"
+  t when is_pid(t) -> "pid"
+  t when is_tuple(t) -> "tuple"
+  t when is_map(t) -> "map"
+  [] -> "the empty list"
+  t when is_list(t) -> "a list with something in it"
+  t when is_bitstring(t) -> "bitstring"
+end
+
+IO.puts("sorted with the standard order, smallest first:\n")
+
+for t <- Enum.sort(mixed) do
+  IO.puts("  " <> label.(t))
+end
+
+IO.puts("")
+IO.puts("[] > {}      #{[] > {}}")
+IO.puts("[] > %{}     #{[] > %{}}")
+IO.puts("[] < [:a]    #{[] < [:a]}")
+```
+
+```
+sorted with the standard order, smallest first:
+
+  float
+  integer
+  atom
+  reference
+  fun
+  port
+  pid
+  tuple
+  map
+  the empty list
+  a list with something in it
+  bitstring
+
+[] > {}      true
+[] > %{}     true
+[] < [:a]    true
+```
+
+The documented order is number, atom, reference, fun, port, pid, tuple, map, nil, list, bitstring, and that is exactly what came out.
+
+The part people get wrong is where nil sits. `[]` sorts above every tuple and above every map, and below any list with something in it. So `[] > {}` is true, and if you are sorting mixed data and expecting the empty list to keep company with lists, it does, but only on one side.
+
+The numbering behind this is in the same header as the tags.
+
+```c
+#define BITSTRING_DEF           0x00
+#define LIST_DEF                0x01
+#define NIL_DEF                 0x02
+#define MAP_DEF                 0x03
+```
+
+`erts/emulator/beam/erl_term.h:1441-1457@OTP-29.0.5`, running on down to `SMALL_DEF` at `0x10`.
+
+Read the sorted output against that list and they are back to front. Bitstring is numbered lowest and sorts highest. Small is numbered highest and sorts lowest. The comparison is what flips it, and it is one line.
+
+```c
+	    j = b_tag - a_tag;
+```
+
+`erts/emulator/beam/utils.c:2459@OTP-29.0.5`. `b` minus `a`, not `a` minus `b`. A positive result means `a` is greater, so a smaller type number means a larger term.
+
+Once you have seen that subtraction, nil sitting between list and map stops being a quirk to memorise. `NIL_DEF` is `0x02`, wedged between `LIST_DEF` at `0x01` and `MAP_DEF` at `0x03`, and the order reverses on the way out. The empty list is not being treated as a special sort of list. It has its own number, and its number is next to the list one.
+
+## Boss fight
+
+Predict, then check. Predicting after you look does not count and you will know.
+
+Four terms. Work out the heap words for each from the rules above, without measuring first.
+
+```elixir
+{:a, :b, :c}
+[:a, :b, :c]
+:binary.copy(<<0>>, 65)
+{:user, "alice", [1, 2, 3], %{admin: true}}
+```
+
+The last one needs every rule in the lesson at once, and `"alice"` in Elixir is a five byte binary.
+
+Load `boss.exs`, which sits next to this notebook, and check yourself. Save the notebook to disk first if you have not, because `__DIR__` is how the cell finds the file and Livebook only knows the directory once the notebook has one.
+
+The cell ships with four zeroes in it, all wrong on purpose. Put your numbers in before you run it.
+
+<!-- cell: boss -->
+
+```elixir
+Code.require_file("boss.exs", __DIR__)
+
+Boss.Grader.check(tuple3: 0, list3: 0, big_binary: 0, record: 0)
+```
+
+The grader has no sizes written into it. It builds each term on your machine and asks the VM, so it stays right on a 32 bit build and on whatever OTP does next.
+
+## If your word size said 32
+
+Everything measured above still holds in shape, and two constants move.
+
+`SMALL_BITS` is `(28)` rather than `(64-4)`, at `erts/emulator/beam/erl_term.h:266@OTP-29.0.5`, so the free integer range is a quarter of a billion values wide rather than a quintillion, and code that treats integers as free up to a few billion is allocating on that build and not on yours. The primary tag is still two bits. It is the payload that shrank.
+
+The binary threshold does not move, because 64 is a byte count rather than a word count, but the word cost on either side of it does, since eight bytes now fill two words rather than one.
+
+This lesson does not measure the 32 bit case, because no 32 bit build was available on any machine it was written on. The constants above are read from the source and nothing more, which is a weaker claim than everything else here, and it is written down that way in the ledger rather than smoothed over.
+
+## What this lesson did not explain
+
+It did not explain the header word in any detail. There are sixteen kinds of boxed term and each has a subtag, at `erts/emulator/beam/erl_term.h:131-148@OTP-29.0.5`, and the arity lives in the bits above the subtag. That layout is worth its own treatment.
+
+It did not explain maps, which measured six words for a single pair and have two entirely different representations depending on size. The small one is a pair of tuples and the large one is a hash array mapped trie, and the switch between them happens at a size you can find with the same bisection used here.
+
+It did not explain what happens to any of this when a term is sent to another process, which is where the difference between eight words on the heap and four kilobytes off it starts to matter. Nor what happens across a network, where every term has to be flattened into bytes and the layout in this lesson stops applying entirely.
+
+It did not explain how the garbage collector uses these tags to walk a heap, which is the reason the tags are laid out the way they are rather than in some other arrangement that would also fit.
+
+The normative writeup of the term layout, with the full subtag table and the parts skipped here, is `BP-TERM-001`.
+
+## Claims this lesson makes
+
+Every claim below is in the ledger with the cell that backs it, so you can find out how each one was checked rather than taking it on trust.
+
+| Claim | How it is backed |
+| --- | --- |
+| Integers, atoms, pids, ports and nil cost no heap at all | `CLM-TERM-0003` |
+| The free integer range is exactly the word minus four tag bits | `CLM-TERM-0004` |
+| A tuple of n costs n plus one words and a list of n costs 2n | `CLM-TERM-0005` |
+| A 65 byte binary costs fewer heap words than a 64 byte one | `CLM-TERM-0006` |
+| There is one empty tuple in the VM and it is not on any process heap | `CLM-TERM-0007` |
+| Nil sorts above tuples and maps and below any non empty list | `CLM-TERM-0008` |
+| The empty tuple is a global literal to keep a read past the arity word safe | `CLM-TERM-0009` |

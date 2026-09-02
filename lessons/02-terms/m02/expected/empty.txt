@@ -1,0 +1,10 @@
+literal in this cell      0 words
+built from a list         0 words
+built by make_tuple/2     0 words
+returned from a call      0 words
+
+all four are equal        true
+and identical             true
+sent from another heap    0 words
+
+a one element tuple, for contrast, costs 2 words
