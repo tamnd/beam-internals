@@ -578,8 +578,7 @@ def etf_undocumented_tags(tree: Path) -> list[str]:
         for name in sorted(found, key=lambda n: emulator[n])
     ]
     return [
-        f"Defined in `{EXTERNAL_H}` with no heading of their own in the standard. "
-        f"{len(rows)} of them.",
+        f"Defined in `{EXTERNAL_H}` with no heading of their own in the standard. {len(rows)} of them.",
         "",
         *table(["Value", "Name", "What it is for"], rows),
     ]
