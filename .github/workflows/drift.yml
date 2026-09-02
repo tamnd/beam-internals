@@ -1,0 +1,76 @@
+# Erlang/OTP keeps moving and this book is pinned, so something has to notice
+# the gap. Once a week the watcher reads the files listed in drift.toml on the
+# upstream branch and compares them with what a person recorded when they last
+# read them. A new opcode or a spent term tag changes lessons whether or not
+# anybody bumps the pin, which is why this watches files and not just releases.
+#
+# It opens an issue and stops there. It never edits a lesson, never bumps the
+# pin, and never touches the ledger. Deciding what a change means is the job of
+# whoever picks the issue up.
+
+name: drift
+
+on:
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: drift
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: compare the pin with upstream
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - name: Read upstream
+        id: watch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set +e
+          python -m tools.drift > drift-report.md
+          echo "moved=$?" >> "$GITHUB_OUTPUT"
+
+      - name: Report
+        run: cat drift-report.md
+
+      # gh rather than a third party action, because this job holds a token that
+      # can write issues and the fewer things that see it the better.
+      - name: Open an issue when something moved
+        if: steps.watch.outputs.moved == '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          title="Upstream drift, week of $(date -u +%Y-%m-%d)"
+          existing=$(gh issue list --label status/drift --state open --limit 1 --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file drift-report.md
+          else
+            gh issue create --title "$title" --body-file drift-report.md \
+              --label status/drift --label kind/maintenance
+          fi
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: always()
+        with:
+          name: drift-report
+          path: drift-report.md
+          retention-days: 90

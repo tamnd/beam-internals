@@ -1,0 +1,69 @@
+name: Lesson
+description: Write a new lesson or revise an existing one
+title: "Lesson: "
+labels: ["kind/lesson"]
+body:
+  - type: input
+    id: id
+    attributes:
+      label: Lesson id
+      description: The id from the curriculum. o for the tour, t for the tools pass, m for mechanics, s for surgery, ca, cb and cc for the capstone tracks.
+      placeholder: m14
+    validations:
+      required: true
+
+  - type: input
+    id: title
+    attributes:
+      label: Working title
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question the reader arrives with
+      description: One sentence, in the words a reader would use before they have the vocabulary this lesson gives them.
+      placeholder: Why does a process that runs a tight loop not starve the others.
+    validations:
+      required: true
+
+  - type: textarea
+    id: gate
+    attributes:
+      label: The prediction gate
+      description: What the reader is asked to predict before running anything, and what makes the answer surprising.
+    validations:
+      required: true
+
+  - type: textarea
+    id: observable
+    attributes:
+      label: What makes it observable
+      description: The cell, the trace, the counter or the dump that shows the answer rather than asserting it. A lesson that cannot show its subject is a lesson that is not ready.
+    validations:
+      required: true
+
+  - type: input
+    id: blueprint
+    attributes:
+      label: Blueprint it belongs to
+      placeholder: BP-SCHED-001
+
+  - type: dropdown
+    id: pass
+    attributes:
+      label: Pass
+      options:
+        - Tourist, first descent
+        - Mechanic, second descent
+        - Surgeon, third descent
+        - Capstone
+    validations:
+      required: true
+
+  - type: input
+    id: cost
+    attributes:
+      label: Estimated reader time
+      placeholder: 55 minutes

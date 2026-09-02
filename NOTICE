@@ -1,0 +1,73 @@
+beam-internals
+Copyright 2026 tamnd and contributors
+
+This repository is dual licensed. Code is Apache-2.0 and is covered by
+LICENSE-CODE.txt. Prose, lessons, blueprints and figures are CC BY-SA 4.0 and
+are covered by LICENSE-CONTENT.txt.
+
+Third party work quoted or referenced by this repository, with the licence it
+arrives under and the obligation that comes with it.
+
+
+Erlang/OTP
+https://github.com/erlang/otp
+Copyright Ericsson AB and the Erlang/OTP contributors
+Apache License 2.0
+
+  Pinned in this repository as a git submodule at tag OTP-29.0.5, commit
+  5cf5f9725452f4e1b6a4890e8ff0305d76924b98. Source is quoted in lessons and in
+  blueprints under the terms of Apache-2.0, with the notice retained and with a
+  citation of the form path:line@OTP-29.0.5. Two documents in erts/doc/guides,
+  erl_ext_dist.md and erl_dist_protocol.md, are public wire specifications and
+  are transcribed into blueprints mechanically.
+
+
+The BEAM Book
+https://github.com/happi/theBeamBook
+Erik Stenman and contributors
+Creative Commons Attribution 4.0 International
+
+  Quoted with attribution in the form: The BEAM Book, version 1.0, section N,
+  Erik Stenman et al., CC BY 4.0. Never paraphrased. Disagreements are filed as
+  issues on that repository and the issue number is recorded in the blueprint
+  that disagrees.
+
+
+Livebook and Kino
+https://github.com/livebook-dev/livebook
+https://github.com/livebook-dev/kino
+Dashbit
+Apache License 2.0
+
+  The lesson format is Livebook markdown. The widgets in bxkino are built on
+  Kino. Neither is vendored here.
+
+
+Manim Community Edition
+https://github.com/ManimCommunity/manim
+MIT License
+
+  Animations in bxmanim are built on it. Not vendored.
+
+
+Concuerror
+https://github.com/parapluu/Concuerror
+Apache License 2.0
+
+  Used as a conformance oracle for ordering and atomicity claims.
+
+
+HARP, Coq and K formalisations of Core Erlang
+https://github.com/harp-project
+Eotvos Lorand University and the University of Kent
+See each repository for its licence
+
+  Cited as a semantics oracle for the abstract machine blueprints.
+
+
+AtomVM
+https://github.com/atomvm/AtomVM
+Apache License 2.0 and LGPL-2.1
+
+  Referenced once as a comparison. Not used, not vendored, and never presented
+  as a stand in for the BEAM.

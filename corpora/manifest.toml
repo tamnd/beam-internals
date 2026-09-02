@@ -1,0 +1,34 @@
+# Provenance for every recorded artefact in this directory.
+#
+# The rule is that an artefact with no entry here is not evidence, it is a file
+# somebody found. A lesson may only be graded against something listed here, and
+# `just bake` refuses to write output for an artefact it cannot attribute.
+#
+# The fields exist because each one has been the thing that mattered at least
+# once. `flavor` because a stock release build has no interpreter to observe.
+# `arch` because the JIT output is a different instruction set on each. `build`
+# because two OTP 29.0.5 builds with different configure flags do not produce
+# the same disassembly.
+
+[defaults]
+tag = "OTP-29.0.5"
+erts = "17.0.5"
+
+# Every artefact declares these, and the defaults above fill in the common case.
+# required: path, produced_by, flavor, arch, os, build, recorded, by_whom, why
+#
+# path        where it lives, relative to corpora/
+# produced_by the exact command, runnable, not a description of one
+# flavor      emu or jit, because a stock release build ships jit only
+# arch        x86_64 or aarch64
+# os          the operating system and version the recorder ran on
+# build       how the emulator was configured, or `release` for a stock install
+# recorded    the date a person ran it
+# by_whom     who ran it, so there is somebody to ask
+# why         which lesson or blueprint needs this, so a stale corpus can be
+#             found and deleted rather than kept because nobody is sure
+
+# Nothing is recorded yet. The first entries land with M1, when the tape
+# recorders in bxtrace/ exist and there is a pinned build to record from. Until
+# then this file is the schema and the reason for it.
+artefact = []

@@ -1,0 +1,49 @@
+# What the drift watcher looks at upstream, and what the pinned tree said when a
+# person last looked. The watcher opens issues. It never edits content.
+
+[upstream]
+repo = "erlang/otp"
+branch = "maint"
+# Releases have landed in May for several years running, so OTP 30 is expected
+# around May 2027 and release candidates come before it.
+expect_next_minor = "2027-05"
+
+[[watch]]
+file = "lib/compiler/src/genop.tab"
+kind = "count"
+pattern = '^\s*\d+:\s'
+expected = 191
+why = "Generic instruction count. The highest signal single file in the tree. A change here moves BP-VM, BP-JIT and roughly a dozen lessons."
+
+[[watch]]
+file = "erts/emulator/beam/erl_term.h"
+kind = "count"
+pattern = '-- FREE --'
+expected = 2
+why = "Unallocated boxed header subtags, counted from the table comment. On the pin these are 0x1 and 0xF, and 0xF is annotated as reserved for external things, so one is genuinely spare. When it goes, the tag taxonomy and the whole of Part 2 change shape."
+
+[[watch]]
+file = "erts/emulator/beam/bif.tab"
+kind = "count"
+pattern = '^bif\s'
+expected = 473
+why = "BIF count, the `bif` lines only. The file also holds 73 `ubif` lines, which are the ones the loader may inline, and those move for different reasons. Feeds the observable surface section of every blueprint."
+
+[[watch]]
+file = "erts/emulator/beam/erl_vm.h"
+kind = "value"
+pattern = '#define CONTEXT_REDS\s+(\d+)'
+expected = "4000"
+why = "The reduction budget. The number this book exists to correct, so a change to it is a change to the pitch."
+
+[[watch]]
+file = "erts/doc/guides/erl_ext_dist.md"
+kind = "lines"
+expected = 803
+why = "The external term format is a public wire standard. Any change is a conformance event for capstone track B."
+
+[[watch]]
+file = "erts/doc/guides/erl_dist_protocol.md"
+kind = "lines"
+expected = 1317
+why = "The distribution protocol, same reason."

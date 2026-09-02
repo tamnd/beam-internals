@@ -1,0 +1,47 @@
+name: Something is broken
+description: A cell does not run, the sandbox will not start, a checker is wrong, a link is dead
+title: "Bug: "
+labels: ["kind/bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce it
+      description: The lesson, the cell, or the command. If it is the sandbox, say how you started it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: where
+    attributes:
+      label: Which part
+      options:
+        - A lesson or a notebook cell
+        - The Node, the sandbox environment
+        - A checker in tools/
+        - The published site
+        - The development container
+        - Something else
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system and architecture, how you are running the environment, and the output of `erlang:system_info(system_version)` if you have a shell.
+      render: text

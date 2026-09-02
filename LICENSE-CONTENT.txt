@@ -1,0 +1,41 @@
+Creative Commons Attribution-ShareAlike 4.0 International
+SPDX-License-Identifier: CC-BY-SA-4.0
+
+Copyright (c) 2026 tamnd and contributors
+
+The prose, diagrams, animations, notebooks and blueprints in this repository
+are licensed under the Creative Commons Attribution-ShareAlike 4.0
+International License.
+
+You are free to share and adapt this material for any purpose, including
+commercially, so long as you give appropriate credit, link to the licence, and
+indicate whether you changed anything. If you build on the material, you must
+distribute your version under this same licence.
+
+The full legal text is at:
+
+  https://creativecommons.org/licenses/by-sa/4.0/legalcode
+
+A plain reading of it is at:
+
+  https://creativecommons.org/licenses/by-sa/4.0/
+
+Attribution that satisfies the licence looks like this:
+
+  "Your first trace", from linux-kernel-internals by tamnd,
+  https://github.com/tamnd/linux-kernel-internals, CC BY-SA 4.0.
+
+
+Which files this covers:
+
+  lessons/           prose, notebooks, diagrams and assets
+  blueprints/        the normative specifications
+  site/              the published book
+  README.md, CONTRIBUTING.md and the other top level documents
+
+The tooling is under a separate licence. See LICENSE-CODE.txt.
+
+Two things in this repository are not ours to license. Text and code quoted
+from the Linux kernel tree stay under the licence they carry in the tree, and
+every quotation records its SPDX identifier. Kernel output pasted into a
+lesson, such as a trace or an oops, is a factual record of what a machine did.

@@ -1,0 +1,71 @@
+# Publishing the site is a separate workflow from testing it, and it only runs
+# when somebody asks for it. The reason is that a docs site with a version
+# switcher is a thing readers link to, and an automatic deploy on every merge to
+# main means a half finished lesson goes live because a checker did not know it
+# was half finished.
+#
+# The ci workflow builds the site on every pull request, so a broken build is
+# still caught immediately. This one only decides when it becomes public.
+
+name: pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The mike version alias to publish, usually the OTP major
+        required: true
+        default: "29"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[site]"
+
+      - name: Stage
+        run: python -m tools.sitebuild
+
+      - name: Build
+        run: mkdocs build --strict --config-file site/mkdocs.yml
+
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d  # v6.0.0
+
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9  # v5.0.0
+        with:
+          path: site/_build
+
+  deploy:
+    name: deploy ${{ inputs.version }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346  # v5.0.1

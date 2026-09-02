@@ -1,0 +1,57 @@
+name: Blueprint
+description: Write a new blueprint or revise an existing one
+title: "Blueprint: "
+labels: ["kind/blueprint"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A blueprint is the normative half. It has to be readable by somebody who never saw the lesson, which is why it may not refer back to one, and `just bplint` will reject it if it does.
+
+  - type: input
+    id: id
+    attributes:
+      label: Blueprint id
+      placeholder: BP-SCHED-001
+    validations:
+      required: true
+
+  - type: input
+    id: subject
+    attributes:
+      label: Subject
+      description: The one mechanism this blueprint specifies. If you need the word and here, it is two blueprints.
+    validations:
+      required: true
+
+  - type: textarea
+    id: surface
+    attributes:
+      label: Observable surface
+      description: The BIFs, the trace events, the counters and the dump fields that let somebody outside the emulator see this mechanism working.
+    validations:
+      required: true
+
+  - type: textarea
+    id: invariants
+    attributes:
+      label: Invariants and ordering guarantees
+      description: What holds. For every ordering guarantee, say what is deliberately not guaranteed alongside it, because that is the half people get wrong.
+    validations:
+      required: true
+
+  - type: textarea
+    id: oracle
+    attributes:
+      label: How a reimplementation would be checked
+      description: The tests, the property, the model or the proof. For anything concurrent, name the oracle rather than describing a demonstration.
+    validations:
+      required: true
+
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources
+      description: Citations as `path:line@OTP-29.0.5`. Cite the table, not the file the emulator generates from it.
+    validations:
+      required: true

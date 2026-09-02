@@ -1,0 +1,51 @@
+# Actions are pinned to a commit, which is the safe thing and also the thing
+# that rots quietly, because a pinned SHA never tells you it is three releases
+# behind. Dependabot is what makes the pin honest.
+#
+# Grouped, because five separate pull requests to bump five actions in the same
+# week is how a repository teaches its maintainers to merge without reading.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: ci
+    labels:
+      - kind/maintenance
+      - area/build
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: tools
+    labels:
+      - kind/maintenance
+      - area/build
+    groups:
+      checkers:
+        patterns:
+          - ruff
+          - pytest
+          - yamllint
+          - zizmor
+      site:
+        patterns:
+          - mkdocs
+          - mkdocs-*
+          - mike

@@ -1,0 +1,42 @@
+# The pin, and what refcheck does with it.
+#
+# A tag on its own is mutable and a commit on its own loses the human readable
+# version, so both are recorded. Every citation in this repository is written as
+# path:line@OTP-29.0.5 and is resolved against the submodule at this commit.
+
+[pin]
+tag = "OTP-29.0.5"
+commit = "5cf5f9725452f4e1b6a4890e8ff0305d76924b98"
+erts = "17.0.5"
+released = "2026-08-03"
+submodule = "otp"
+upstream = "https://github.com/erlang/otp"
+
+[rules]
+# A citation may cover at most this many lines. Needing more than this means the
+# lesson is two lessons.
+max_span = 40
+
+# Files the emulator generates from a table. Citing one of these points a reader
+# at output instead of at the source they can change.
+generated = [
+  "erts/emulator/beam/beam_hot.h",
+  "erts/emulator/beam/beam_cold.h",
+  "erts/emulator/beam/beam_opcodes.c",
+  "erts/emulator/beam/beam_opcodes.h",
+  "erts/emulator/beam/beam_tr_funcs.h",
+  "erts/emulator/beam/erl_bif_table.c",
+  "erts/emulator/beam/erl_bif_table.h",
+  "erts/emulator/beam/erl_atom_table.h",
+]
+
+# The tables the generated files come from. Cite these instead.
+tables = [
+  "lib/compiler/src/genop.tab",
+  "erts/emulator/beam/emu/ops.tab",
+  "erts/emulator/beam/jit/x86/ops.tab",
+  "erts/emulator/beam/jit/arm/ops.tab",
+  "erts/emulator/beam/bif.tab",
+  "erts/emulator/beam/atom.names",
+  "erts/emulator/beam/erl_alloc.types",
+]

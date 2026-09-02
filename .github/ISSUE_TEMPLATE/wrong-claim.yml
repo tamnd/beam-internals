@@ -1,0 +1,61 @@
+name: The book says something untrue
+description: A claim about the VM is wrong, out of date, or not supported by the evidence attached to it
+title: "Wrong claim: "
+labels: ["kind/wrong-claim", "priority/now"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This is the most valuable kind of issue here, so it is first in the list. A book that tells you the BEAM gives every process 2000 reductions is worse than no book, because you now believe something and have no reason to check it.
+
+  - type: input
+    id: where
+    attributes:
+      label: Where
+      description: The lesson id, blueprint id, or file and line.
+      placeholder: m14, or BP-SCHED-001 section 3
+    validations:
+      required: true
+
+  - type: input
+    id: claim
+    attributes:
+      label: Claim id if it has one
+      description: Claims in the ledger have an id. Leave blank if this one never made it into the ledger, which is itself worth knowing.
+      placeholder: CLM-SCHED-0001
+
+  - type: textarea
+    id: says
+    attributes:
+      label: What it says
+      description: Quote it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actually
+    attributes:
+      label: What is actually the case
+      description: What the runtime does instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: How you know
+      description: A cell somebody can run, a citation as `path:line@OTP-29.0.5`, a trace, or a proof. If you are sure but cannot show it, say that plainly and it gets investigated rather than dismissed.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Was this true once
+      options:
+        - It was never true
+        - It was true at an older OTP and the runtime changed
+        - It is true on some builds or platforms and not others
+        - I do not know
+    validations:
+      required: true

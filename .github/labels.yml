@@ -1,0 +1,149 @@
+# The label set, kept in the repository so that it can be reviewed and restored
+# rather than living only in the web interface where it drifts.
+#
+# Four families. kind is what sort of work it is, area is which part of the
+# runtime it touches, priority is when it gets done, status is what is blocking
+# it. An issue should carry one kind, at least one area, one priority, and a
+# status only when there is something worth saying.
+#
+# Apply with: just labels
+
+- name: kind/lesson
+  color: "0E8A16"
+  description: Write or revise a lesson
+
+- name: kind/blueprint
+  color: "1D76DB"
+  description: Write or revise a blueprint, the normative half
+
+- name: kind/milestone
+  color: "5319E7"
+  description: A milestone from the plan, tracking the work under it
+
+- name: kind/bug
+  color: "D73A4A"
+  description: Something in the repository is wrong
+
+- name: kind/wrong-claim
+  color: "B60205"
+  description: The book states something about the VM that is not true
+
+- name: kind/tooling
+  color: "C2E0C6"
+  description: The checkers, the site build, the sandbox
+
+- name: kind/maintenance
+  color: "FEF2C0"
+  description: Dependency bumps, pin moves, housekeeping
+
+- name: kind/question
+  color: "D4C5F9"
+  description: An open question from the plan, not yet decided
+
+- name: kind/accessibility
+  color: "0052CC"
+  description: Colour, contrast, captions, keyboard, screen reader
+
+- name: area/terms
+  color: "BFD4F2"
+  description: Tagging, term layout, heap representation
+
+- name: area/compiler
+  color: "BFD4F2"
+  description: Erlang and Elixir front ends, Core, SSA, the pass pipeline
+
+- name: area/loader
+  color: "BFD4F2"
+  description: The beam file format, chunks, loading and code replacement
+
+- name: area/vm
+  color: "BFD4F2"
+  description: The interpreter, the op tables, beam_makeops
+
+- name: area/jit
+  color: "BFD4F2"
+  description: BeamAsm, x86-64 and AArch64 backends
+
+- name: area/scheduler
+  color: "BFD4F2"
+  description: Reductions, run queues, migration, dirty schedulers
+
+- name: area/memory
+  color: "BFD4F2"
+  description: Per process garbage collection, erts_alloc, the shared heap
+
+- name: area/signals
+  color: "BFD4F2"
+  description: Message passing, links, monitors, the unified signal queue
+
+- name: area/ets
+  color: "BFD4F2"
+  description: ETS, decentralised counters, CA trees
+
+- name: area/io
+  color: "BFD4F2"
+  description: Ports, drivers, NIFs, the poll set
+
+- name: area/distribution
+  color: "BFD4F2"
+  description: The external term format and the distribution protocol
+
+- name: area/observability
+  color: "BFD4F2"
+  description: Tracing, msacc, instrument, erts_debug, crash dumps
+
+- name: area/tier0
+  color: "D2B48C"
+  description: The Node, the sandbox, the reader environment
+
+- name: area/capstone
+  color: "D2B48C"
+  description: The three capstone tracks
+
+- name: area/pedagogy
+  color: "D2B48C"
+  description: Lesson shape, prediction gates, the three passes
+
+- name: area/site
+  color: "D2B48C"
+  description: The published site, navigation, versioning
+
+- name: area/build
+  color: "D2B48C"
+  description: CI, workflows, the development container
+
+- name: priority/now
+  color: "E11D21"
+  description: Blocking the current milestone
+
+- name: priority/next
+  color: "EB6420"
+  description: Wanted, not blocking
+
+- name: priority/someday
+  color: "FBCA04"
+  description: Worth doing when there is room
+
+- name: status/blocked
+  color: "000000"
+  description: Waiting on something outside this issue
+
+- name: status/needs-evidence
+  color: "5319E7"
+  description: A claim here is not yet backed by a cell, a proof or a citation
+
+- name: status/needs-review
+  color: "006B75"
+  description: Written and waiting on the second reviewer
+
+- name: status/drift
+  color: "F9D0C4"
+  description: Opened by the drift watcher, upstream moved
+
+- name: good first issue
+  color: "7057FF"
+  description: Small, self contained, a good place to start
+
+- name: help wanted
+  color: "008672"
+  description: Would benefit from somebody who knows this area

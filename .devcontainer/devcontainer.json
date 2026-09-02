@@ -1,0 +1,33 @@
+{
+  "name": "beam-internals",
+  "build": {
+    "dockerfile": "Dockerfile"
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "erlang-ls.erlang-ls",
+        "JakeBecker.elixir-ls",
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "redhat.vscode-yaml"
+      ],
+      "settings": {
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true
+      }
+    }
+  },
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": {
+      "label": "Livebook",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "python3 -m pip install --break-system-packages -e '.[dev,site]' && python3 -m tools.lintprose",
+  "remoteUser": "vscode"
+}

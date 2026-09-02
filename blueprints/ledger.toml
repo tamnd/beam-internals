@@ -1,0 +1,82 @@
+# The claim ledger.
+#
+# Any sentence that asserts the BEAM does something is a claim, and every claim
+# has an entry here naming what backs it. Structural statements count. Opinions
+# do not, and are marked in the prose as the author's view.
+#
+# Evidence classes, strongest first:
+#
+#   observed           a cell in this repository demonstrates it and CI runs it
+#   proved             Concuerror, PropEr, TLA+ or Coq establishes it
+#   contractual        an upstream normative document says so, quoted and cited
+#   demonstrated-only  a concurrency claim backed by runs rather than by search
+#   unobservable       source reading, with no runtime evidence available
+#
+# The last two are capped per lesson at two and three. The caps are the point.
+# They force the author to find an observation or to admit the gap.
+#
+# `verified` is when a person last checked the entry against the pinned tree. An
+# entry older than the current pin is stale and cannot back a stable blueprint.
+
+[[claim]]
+id = "CLM-SCHED-0001"
+text = "A process is given a budget of 4000 reductions, not 2000."
+where = ["t07", "BP-SCHED-002#4"]
+evidence = "observed"
+by = ["cell:t07/reds-tape", "erts/emulator/beam/erl_vm.h:53@OTP-29.0.5"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-VM-0001"
+text = "OTP 29.0.5 defines 191 generic BEAM instructions, one of which is deprecated."
+where = ["o05", "BP-VM-001#2"]
+evidence = "observed"
+by = ["cell:o05/genop-count", "lib/compiler/src/genop.tab:1@OTP-29.0.5"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-TERM-0001"
+text = "Fourteen of the sixteen boxed header subtags are allocated. 0x1 and 0xF have no define, and 0xF is annotated as reserved for external things, so there is one subtag genuinely spare."
+where = ["m02", "m03", "BP-TERM-001#2"]
+evidence = "observed"
+by = ["cell:m02/subtag-table", "erts/emulator/beam/erl_term.h:131-148@OTP-29.0.5"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-TERM-0002"
+text = "Subtag 0x7 was free in OTP 28.1.1 and holds RECORD_SUBTAG in OTP 29.0.5."
+where = ["m03", "BP-TERM-001#9"]
+evidence = "observed"
+by = ["cell:m03/subtag-diff", "erts/emulator/beam/erl_term.h:1@OTP-29.0.5"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-COMP-0001"
+text = "Compiling a six line module runs 33 top level passes and 60 sub passes."
+where = ["t02", "BP-COMP-001#3"]
+evidence = "observed"
+by = ["cell:t02/erlc-time"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-OBS-0001"
+text = "Microstate accounting reports seven counters for each of 33 runtime threads."
+where = ["t08", "BP-OBS-001#6"]
+evidence = "observed"
+by = ["cell:t08/msacc"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-VM-0002"
+text = "A stock OTP release build ships only the jit flavor, so erts_debug:df/1 has no interpreter to disassemble and writes an empty file."
+where = ["m21", "BP-VM-003#6"]
+evidence = "observed"
+by = ["cell:m21/flavor-check"]
+verified = 2026-09-02
+by_whom = "tamnd"

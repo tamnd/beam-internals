@@ -1,0 +1,19 @@
+# Everything has an owner so that no pull request sits with nobody named on it.
+# The interesting entries are the ones below the catch all, where a change is
+# cheap to make and expensive to get wrong.
+
+*                       @tamnd
+
+# The pin and the drift watcher decide what every citation in the book means.
+# Moving either of them silently invalidates work that is already merged.
+/refcheck.toml          @tamnd
+/drift.toml             @tamnd
+
+# The claim ledger is the record of what this book says is true and how it was
+# checked. An edit here is a claim about the VM, not a docs change.
+/blueprints/ledger.toml @tamnd
+
+# The checkers are the only thing standing between the house style and the
+# gradual return of the word obviously.
+/tools/                 @tamnd
+/.github/workflows/     @tamnd

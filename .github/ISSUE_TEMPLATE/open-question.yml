@@ -1,0 +1,40 @@
+name: Open question
+description: A decision the project has not made yet, with the options and what each one costs
+title: "Question: "
+labels: ["kind/question", "priority/next"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Open questions are tracked as issues so that the answer is recorded next to the reasoning, and so that a decision made once is not quietly remade six months later by somebody who never saw the argument.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: One sentence, phrased so that it has an answer.
+    validations:
+      required: true
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it is open
+      description: What makes this hard, and what work is blocked while it stays open.
+    validations:
+      required: true
+
+  - type: textarea
+    id: options
+    attributes:
+      label: The options
+      description: Each one with what it costs and what it gives up. If there is a leaning, say so and say why.
+    validations:
+      required: true
+
+  - type: input
+    id: deadline
+    attributes:
+      label: When it has to be answered
+      description: The milestone this blocks, or a date.
+      placeholder: Before M4 starts

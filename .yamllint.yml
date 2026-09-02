@@ -1,0 +1,14 @@
+# Workflow files are the only YAML that matters here, and they are read far more
+# often than they are written, so the rules are about readability rather than
+# style points. Line length is off because an action pin is one long line by
+# nature and wrapping it hides the SHA.
+
+extends: default
+
+rules:
+  line-length: disable
+  document-start: disable
+  comments:
+    min-spaces-from-content: 1
+  truthy:
+    check-keys: false

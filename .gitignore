@@ -1,0 +1,59 @@
+# Erlang and Elixir
+_build/
+deps/
+*.beam
+*.ez
+erl_crash.dump
+.rebar3/
+rebar3.crashdump
+.elixir_ls/
+.lexical/
+
+# Crash dumps a lesson deliberately produces are corpus material and live in
+# corpora/dumps with a manifest entry. Anything landing at the top level is
+# accidental.
+
+# Python, for the tools and the animations
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Node, for the gateway tests
+node_modules/
+*.tsbuildinfo
+
+# Site output, and everything staged into it. MkDocs can only see what is under
+# its docs directory, so `just site-stage` copies the pages in. The originals
+# are the committed ones. site/mkdocs.yml is generated and is committed, so that
+# a lesson added without a page fails the build instead of going unnoticed.
+site/_build/
+site/docs/
+.cache/
+
+# Rendered animations. The scenes are in the repository, the videos are not.
+bxmanim/media/
+*.mp4
+*.webm
+
+# Emulator builds. The recipe is in the repository, the output is not.
+otp-build/
+*.o
+*.so
+*.dylib
+
+# Scratch traces and dumps land here while you work. Anything a lesson depends
+# on goes into corpora/ instead, committed, so the build is reproducible.
+scratch/
+*.tape.raw
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/
+*.swp

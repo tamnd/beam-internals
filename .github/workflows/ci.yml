@@ -1,0 +1,173 @@
+# Every gate a pull request has to pass. The jobs are split by what a failure
+# means, not by what is convenient to run together, so the job name tells you
+# who has to fix it. Prose failures belong to the author, tools failures belong
+# to whoever changed a checker.
+#
+# Actions are pinned to a commit rather than a tag. A tag can be moved, a commit
+# cannot, and this repository runs on a schedule against a token that can open
+# issues. Dependabot bumps the pins and the comment next to each one says which
+# release the SHA is.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+
+jobs:
+  prose:
+    name: prose, ledger, blueprints, citations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: House style
+        run: python -m tools.lintprose
+
+      - name: Claim ledger
+        run: python -m tools.ledger
+
+      - name: Blueprint structure
+        run: python -m tools.bplint
+
+      - name: Citations resolve and match the pin
+        run: python -m tools.refcheck
+
+  citations-deep:
+    name: citations against the pinned OTP tree
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # The submodule is the whole OTP tree at the pinned tag and lands in M0.
+      # Until it does there is nothing to resolve against, so this step reports
+      # that and the job stays green. Once .gitmodules exists the strict run
+      # takes over and a citation pointing at a line that is not there fails.
+      - name: Is the pinned tree available
+        id: pinned
+        run: |
+          if [ -f .gitmodules ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "No submodule yet, so only the shape of each citation is checked."
+          fi
+
+      - name: Every path and line number exists at the pin
+        if: steps.pinned.outputs.present == 'true'
+        run: python -m tools.refcheck --strict
+
+  tools:
+    name: tools lint and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[dev]"
+
+      - name: Ruff
+        run: ruff check tools tests
+
+      - name: Ruff format
+        run: ruff format --check tools tests
+
+      - name: Tests
+        run: pytest
+
+  workflows:
+    name: workflow lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install
+        run: python -m pip install yamllint==1.38.0 zizmor==1.30.0
+
+      - name: Yamllint
+        run: yamllint .github .yamllint.yml site/mkdocs.base.yml
+
+      # zizmor knows about the failure modes that are specific to Actions, which
+      # are template injection, a token with more scope than the job needs, and
+      # an unpinned third party action. It is a pip package rather than an
+      # action so that linting the supply chain does not add to it.
+      - name: Zizmor
+        run: zizmor --persona=regular .github/workflows
+
+  site:
+    name: site builds and the nav is current
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install
+        run: python -m pip install -e ".[site]"
+
+      # The check runs before the stage so that a lesson added without its nav
+      # entry fails here rather than becoming a page nobody can reach.
+      - name: Navigation is up to date
+        run: python -m tools.sitebuild --check
+
+      - name: Stage
+        run: python -m tools.sitebuild
+
+      - name: Build
+        run: mkdocs build --strict --config-file site/mkdocs.yml
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: site
+          path: site/_build
+          retention-days: 7

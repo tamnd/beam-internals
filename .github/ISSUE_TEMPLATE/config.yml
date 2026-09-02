@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: Ask about the BEAM itself
+    url: https://erlangforums.com
+    about: Questions about Erlang, Elixir or OTP that are not about this book are better answered by people who work on the runtime.
+
+  - name: Report a security problem
+    url: https://github.com/tamnd/beam-internals/security/advisories/new
+    about: The sandbox and the distribution capstone are the parts worth reporting privately. See SECURITY.md for what is in scope.
+
+  - name: Report a bug in Erlang/OTP
+    url: https://github.com/erlang/otp/issues
+    about: If the runtime is wrong rather than the book, it belongs upstream. Say so here afterwards and the lesson gets a note.
