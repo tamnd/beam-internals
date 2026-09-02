@@ -352,14 +352,21 @@ def modified_timings(tree: Path) -> list[str]:
     for level, (delay, reds) in enumerate(TIMING_ROW.findall(body.group(1))):
         slice_size = evaluate(re.sub(r"\bCONTEXT_REDS\b", str(full), reds))
         share = f"{slice_size / full:.3f}".rstrip("0").rstrip(".")
-        rows.append([str(level), str(slice_size), share, f"{delay} ms"])
+        # The second field is a timeout handed to `erlang:delay_trap/2`, which
+        # does `receive after Timeout`, so it is milliseconds. Zero is not a
+        # zero length sleep, it is a different branch that yields instead, and
+        # writing "0 ms" in a normative document would hide that.
+        held = "yields instead of sleeping" if delay == "0" else f"{delay} ms"
+        rows.append([str(level), str(slice_size), share, held])
     if not rows:
         raise Unreadable("erts_modified_timings[] parsed to no rows")
     return [
         f"`+T Level` replaces the slice with the value on its row. The default, with no "
-        f"`+T` at all, is `CONTEXT_REDS`, which is {full}.",
+        f"`+T` at all, is `CONTEXT_REDS`, which is {full}. The last column is a separate "
+        f"effect of the same option: `spawn`, `link`, `monitor` and their neighbours trap "
+        f"through `erlang:delay_trap/2` on the way out.",
         "",
-        *table(["Level", "Slice", "Share of a full slice", "Added delay"], rows),
+        *table(["Level", "Slice", "Share of a full slice", "Delay after spawn and friends"], rows),
     ]
 
 
