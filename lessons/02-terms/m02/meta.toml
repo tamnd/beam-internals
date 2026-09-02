@@ -50,7 +50,7 @@ deterministic = [
 
 # The banner prints the build you are sitting on, so it is run to check it does
 # not crash and its output is not compared.
-timing_only = ["banner"]
+not_compared = ["banner"]
 
 [verified]
 # Both architectures, both on the pinned release, running the same cells pulled

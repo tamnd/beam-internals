@@ -1,0 +1,67 @@
+id = "m55"
+title = "The external term format, byte by byte"
+part = "12-dist"
+pass = "mechanic"
+
+# Tier 0, which is what the milestone plan said, and for once the reason is
+# worth writing down rather than assuming. A lesson about distribution sounds
+# like it needs two nodes. This one needs none, because `term_to_binary/1`
+# produces the same bytes the distribution would send and `binary_to_term/1`
+# reads them back, so the whole format can be studied inside one stock release
+# install with no network and no node name.
+env = "T0"
+requires = ["otp-29", "livebook"]
+
+duration_minutes = 60
+deps = ["m02"]
+blueprint = "BP-DIST-001"
+boss = "boss.exs"
+
+claims = [
+  "CLM-DIST-0001",
+  "CLM-DIST-0002",
+  "CLM-DIST-0003",
+  "CLM-DIST-0004",
+  "CLM-DIST-0005",
+  "CLM-DIST-0006",
+  "CLM-DIST-0007",
+  "CLM-DIST-0008",
+  "CLM-DIST-0009",
+  "CLM-DIST-0010",
+]
+
+# The prediction gate. The first two are wrong for most people because they are
+# thinking about the heap. The third is wrong for almost everyone.
+predictions = [
+  "[1, 2, 3] and {1, 2, 3}. Which is more bytes on the wire, and by how much?",
+  "The largest integer that costs zero heap words. How many bytes is it on the wire?",
+  "The same map encoded on two nodes running the same release. Same bytes?",
+]
+
+[bake]
+# Cells whose output is identical on every machine, so CI can compare them.
+deterministic = [
+  "wire",
+  "decode",
+  "handmade",
+  "integers",
+  "atoms",
+  "strings",
+  "maps",
+  "options",
+  "untrusted",
+  "boss",
+]
+
+# Cells that are run so that one which stops compiling is caught, and whose
+# output is not compared against anything. The banner prints the build in front
+# of you, which is different on every machine and is the point of printing it.
+not_compared = ["banner"]
+
+[verified]
+# Both architectures, both on the pinned release, running the same cells pulled
+# straight out of the notebook.
+"aarch64-darwin" = "OTP 29 erts-17.0.5, Elixir 1.20.4"
+"x86_64-linux" = "OTP 29 erts-17.0.5, Elixir 1.20.4"
+on = 2026-09-02
+by = "tamnd"

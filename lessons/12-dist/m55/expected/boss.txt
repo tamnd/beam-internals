@@ -1,0 +1,16 @@
+44 terms in the corpus
+10 match the VM byte for byte
+34 do not
+
+6 of them, spread across the corpus:
+  256                           raised FunctionClauseError
+  -2147483649                   raised FunctionClauseError
+  -0.5                          raised FunctionClauseError
+  <<0, 255>>                    first differs at byte 3
+      yours ... 109 0 2 0 255
+      the VM ... 109 0 0 0 2 0 255
+  [1, 2, 300]                   raised FunctionClauseError
+  %{}                           raised FunctionClauseError
+
+Read the byte where they first differ, look that tag up in the standard,
+and fix one clause at a time. The oracle is not going anywhere.

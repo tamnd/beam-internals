@@ -1,0 +1,794 @@
+# m55 The external term format, byte by byte
+
+## Before you start
+
+You need an Erlang/OTP 29 install and Livebook. Nothing else. No second node, no network, no emulator build, no root.
+
+This lesson takes about an hour. It was written and measured against Erlang/OTP 29 erts-17.0.5 on aarch64 macOS and on x86-64 Linux, and every recorded number below came out the same on both.
+
+Run this first so you know what you are sitting on.
+
+<!-- cell: banner -->
+
+```elixir
+IO.puts(:erlang.system_info(:system_version))
+
+IO.puts("otp release   #{:erlang.system_info(:otp_release)}")
+IO.puts("word size     #{:erlang.system_info(:wordsize) * 8} bit")
+```
+
+Word size matters much less here than it did in the lesson on what a term costs. The external term format is the same bytes on a 32 bit build, on a 64 bit build, on a big endian machine and on a machine that has never run Erlang at all. That is the point of having it.
+
+## The question
+
+Two processes on one machine share a heap layout, so sending a message between them can be a copy of words that already mean something. Two nodes on a network share nothing. Word size, endianness, pointer values, the atom table, none of it carries. So every term that crosses a node boundary is flattened into bytes first, and those bytes are described by a public standard that has been stable for decades.
+
+You can see those bytes without a network. `term_to_binary/1` produces exactly what the distribution would send, and `binary_to_term/1` reads it back.
+
+The standard lives in the OTP tree and it opens by drawing the whole format as a three column table at `erts/doc/guides/erl_ext_dist.md:24-46@OTP-29.0.5`. It runs to about eight hundred lines in total, which is short enough to read in an afternoon. This lesson reads the parts you will actually meet, and it checks every one of them against a running VM rather than taking the document's word for it.
+
+The thing worth knowing before you start is that the wire and the heap disagree about almost everything. A term that is free on the heap can be twelve bytes on the wire. A term that is cheap on the heap can be the expensive one to send. If you have a mental model of what your data costs, it is a model of one of the two, and you are about to find out which.
+
+## Predict before you run
+
+Write these down before you scroll.
+
+**One.** `[1, 2, 3]` and `{1, 2, 3}`. Which one is more bytes on the wire, and by how much?
+
+**Two.** The largest integer that costs zero heap words is 576460752303423487. How many bytes is it on the wire?
+
+**Three.** You encode the same map on two nodes running the same release. Do you get the same bytes?
+
+Now measure.
+
+## Twenty terms on the wire
+
+One column is what the term costs to send. One column is what it costs to hold. They are not the same number and they are frequently not in the same order.
+
+<!-- cell: wire -->
+
+```elixir
+# Every tag number below is copied out of the wire standard, not read out of the
+# emulator source. That is the whole point of this format. It is written down in
+# public, it is stable across releases, and a decoder in any language reads the
+# same bytes you are about to look at.
+tag_names = %{
+  67 => "RECORD_EXT",
+  70 => "NEW_FLOAT_EXT",
+  77 => "BIT_BINARY_EXT",
+  80 => "compressed",
+  88 => "NEW_PID_EXT",
+  90 => "NEWER_REFERENCE_EXT",
+  97 => "SMALL_INTEGER_EXT",
+  98 => "INTEGER_EXT",
+  99 => "FLOAT_EXT",
+  100 => "ATOM_EXT",
+  104 => "SMALL_TUPLE_EXT",
+  105 => "LARGE_TUPLE_EXT",
+  106 => "NIL_EXT",
+  107 => "STRING_EXT",
+  108 => "LIST_EXT",
+  109 => "BINARY_EXT",
+  110 => "SMALL_BIG_EXT",
+  111 => "LARGE_BIG_EXT",
+  112 => "NEW_FUN_EXT",
+  113 => "EXPORT_EXT",
+  116 => "MAP_EXT",
+  118 => "ATOM_UTF8_EXT",
+  119 => "SMALL_ATOM_UTF8_EXT",
+  121 => "LOCAL_EXT"
+}
+
+terms = [
+  {"0", 0},
+  {"255", 255},
+  {"256", 256},
+  {"-1", -1},
+  {"2147483648", 2_147_483_648},
+  {"576460752303423487", 576_460_752_303_423_487},
+  {"1.0", 1.0},
+  {":ok", :ok},
+  {"[]", []},
+  {"[1, 2, 3]", [1, 2, 3]},
+  {"{1, 2, 3}", {1, 2, 3}},
+  {"[:a, :b, :c]", [:a, :b, :c]},
+  {"\"alice\"", "alice"},
+  {"<<1::size(3)>>", <<1::size(3)>>},
+  {"%{admin: true}", %{admin: true}},
+  {"[:a | :b]", [:a | :b]},
+  {"{}", {}},
+  {"%{}", %{}},
+  {"the record below", {:user, "alice", [1, 2, 3], %{admin: true}}},
+  {"65 zero bytes", :binary.copy(<<0>>, 65)}
+]
+
+word = :erlang.system_info(:wordsize)
+
+IO.puts("term                  wire  heap  heap  tag  name")
+IO.puts("                     bytes words bytes")
+
+for {label, term} <- terms do
+  bytes = :erlang.term_to_binary(term)
+  <<131, tag, _rest::binary>> = bytes
+  words = :erts_debug.flat_size(term)
+
+  IO.puts(
+    String.pad_trailing(label, 20) <>
+      String.pad_leading(to_string(byte_size(bytes)), 6) <>
+      String.pad_leading(to_string(words), 6) <>
+      String.pad_leading(to_string(words * word), 6) <>
+      String.pad_leading(to_string(tag), 5) <>
+      "  " <> Map.fetch!(tag_names, tag)
+  )
+end
+```
+
+```
+term                  wire  heap  heap  tag  name
+                     bytes words bytes
+0                        3     0     0   97  SMALL_INTEGER_EXT
+255                      3     0     0   97  SMALL_INTEGER_EXT
+256                      6     0     0   98  INTEGER_EXT
+-1                       6     0     0   98  INTEGER_EXT
+2147483648               8     0     0  110  SMALL_BIG_EXT
+576460752303423487      12     0     0  110  SMALL_BIG_EXT
+1.0                     10     2    16   70  NEW_FLOAT_EXT
+:ok                      5     0     0  119  SMALL_ATOM_UTF8_EXT
+[]                       2     0     0  106  NIL_EXT
+[1, 2, 3]                7     6    48  107  STRING_EXT
+{1, 2, 3}                9     4    32  104  SMALL_TUPLE_EXT
+[:a, :b, :c]            16     6    48  108  LIST_EXT
+"alice"                 11     3    24  109  BINARY_EXT
+<<1::size(3)>>           8     3    24   77  BIT_BINARY_EXT
+%{admin: true}          19     6    48  116  MAP_EXT
+[:a | :b]               12     2    16  108  LIST_EXT
+{}                       3     0     0  104  SMALL_TUPLE_EXT
+%{}                      6     3    24  116  MAP_EXT
+the record below        43    20   160  104  SMALL_TUPLE_EXT
+65 zero bytes           71     8    64  109  BINARY_EXT
+```
+
+Start with the two that answer prediction one. `[1, 2, 3]` is 7 bytes on the wire and 48 on the heap. `{1, 2, 3}` is 9 on the wire and 32 on the heap. The list is cheaper to send and more expensive to hold, and the tuple is the other way round, so any rule of thumb you carry about which one is cheap is a rule about one of the two columns and you now know which.
+
+The reason is in the tag column. A list of small integers gets `STRING_EXT`, which writes a two byte length and then one byte per element, because sending byte lists is common enough that the format has a special case for it. A tuple has to write a tag for each element, and each of those small integers costs two bytes rather than one. The moment the list stops being all bytes, that special case is gone. `[:a, :b, :c]` is 16 bytes for three atoms one letter long.
+
+Prediction two is on the row for 576460752303423487. Zero heap words, because it is an immediate, and twelve bytes on the wire as `SMALL_BIG_EXT`. The wire has no idea what a machine word is, so it cannot have the concept the heap is using. There is a whole section on this below.
+
+The last row is the one that changes how you think about sending data. Sixty five bytes of binary costs 64 bytes of heap, because the data lives off the heap and the process holds a reference to it, and that reference is a fixed size no matter how large the data gets. On the wire there is no such thing as a reference. Every byte goes. Make that binary four kilobytes and the heap cost stays at 64 bytes while the wire cost goes to 4102. Sending a large binary to another process on the same node is nearly free and sending it to another node is not, and the two columns above are the reason.
+
+## Reading one of them by hand
+
+Take the last of those terms and read every byte of it against the standard. The point of this cell is that nothing in it computes the reading. The reading is typed out by hand, and the check at the bottom is whether the pieces laid end to end are the bytes the VM actually produced.
+
+<!-- cell: decode -->
+
+```elixir
+term = {:user, "alice", [1, 2, 3], %{admin: true}}
+
+# This is the reading, written out by hand from the standard. Nothing below
+# computes it. The check at the bottom lays these pieces end to end and asks
+# whether they are the bytes the VM actually produced, so a wrong reading cannot
+# quietly pass.
+reading = [
+  {<<131>>, "version number, first byte of every encoded term"},
+  {<<104, 4>>, "SMALL_TUPLE_EXT, arity 4, four terms follow"},
+  {<<119, 4, "user">>, "SMALL_ATOM_UTF8_EXT, 4 bytes, the atom :user"},
+  {<<109, 0, 0, 0, 5, "alice">>, "BINARY_EXT, 4 byte length, 5 bytes of data"},
+  {<<107, 0, 3, 1, 2, 3>>, "STRING_EXT, 2 byte length, the list [1, 2, 3]"},
+  {<<116, 0, 0, 0, 1>>, "MAP_EXT, 4 byte arity, one key and one value follow"},
+  {<<119, 5, "admin">>, "SMALL_ATOM_UTF8_EXT, the key :admin"},
+  {<<119, 4, "true">>, "SMALL_ATOM_UTF8_EXT, the value true"}
+]
+
+{lines, total} =
+  Enum.map_reduce(reading, 0, fn {chunk, meaning}, offset ->
+    line =
+      String.pad_leading(to_string(offset), 3) <>
+        "  " <>
+        String.pad_trailing(Enum.map_join(:binary.bin_to_list(chunk), " ", &to_string/1), 40) <>
+        meaning
+
+    {line, offset + byte_size(chunk)}
+  end)
+
+IO.puts("off  bytes                                   meaning")
+Enum.each(lines, &IO.puts/1)
+
+rebuilt = reading |> Enum.map(&elem(&1, 0)) |> IO.iodata_to_binary()
+
+IO.puts("")
+IO.puts("bytes accounted for: #{total}")
+IO.puts("the VM produced:     #{byte_size(:erlang.term_to_binary(term))}")
+IO.puts("the reading is the encoding: #{rebuilt == :erlang.term_to_binary(term)}")
+IO.puts("and it decodes back to the term: #{:erlang.binary_to_term(rebuilt) == term}")
+```
+
+```
+off  bytes                                   meaning
+  0  131                                     version number, first byte of every encoded term
+  1  104 4                                   SMALL_TUPLE_EXT, arity 4, four terms follow
+  3  119 4 117 115 101 114                   SMALL_ATOM_UTF8_EXT, 4 bytes, the atom :user
+  9  109 0 0 0 5 97 108 105 99 101           BINARY_EXT, 4 byte length, 5 bytes of data
+ 19  107 0 3 1 2 3                           STRING_EXT, 2 byte length, the list [1, 2, 3]
+ 25  116 0 0 0 1                             MAP_EXT, 4 byte arity, one key and one value follow
+ 30  119 5 97 100 109 105 110                SMALL_ATOM_UTF8_EXT, the key :admin
+ 37  119 4 116 114 117 101                   SMALL_ATOM_UTF8_EXT, the value true
+
+bytes accounted for: 43
+the VM produced:     43
+the reading is the encoding: true
+and it decodes back to the term: true
+```
+
+![Forty three bytes and what each one is doing](files/wire-bytes.svg)
+
+There is no framing, no padding and no alignment. Byte 3 is the start of the atom because byte 2 said the tuple has four elements and the first of them begins right there. A decoder is a loop that reads one tag byte and then knows how many bytes to read next, which is why decoders for this format exist in every language people have wanted to talk to Erlang from.
+
+Four things in that dump are worth stopping on.
+
+The atom `:user` is written out as text. There is no number that means `:user`, because the receiving node has its own atom table with its own numbers in it and they will not agree. Atoms cost their name in bytes every time you send one. The distribution has a cache to avoid resending the same atom on the same connection, and `term_to_binary/1` does not use it.
+
+`"alice"` in Elixir is a binary, so it gets `BINARY_EXT` and a four byte length. In Erlang `"alice"` is a list of five integers and would get `STRING_EXT` and a two byte length. Same five characters, different tag, because they are different terms.
+
+The list `[1, 2, 3]` occupies six bytes with no tail marker. `STRING_EXT` is defined as a proper list of bytes and the closing nil is implied. `LIST_EXT` writes its tail out, which is how improper lists survive the trip. That is why `[:a | :b]` in the table above is `LIST_EXT` with a length of one.
+
+The map writes a four byte arity for a single pair. There is no small map tag. Every map on the wire pays four bytes for its size whether it has one key or a million.
+
+## Writing one by hand
+
+The mirror of reading bytes is writing them. Here is a process identifier belonging to a node this VM has never spoken to, built one field at a time out of nothing but a binary literal.
+
+<!-- cell: handmade -->
+
+```elixir
+# A process identifier belonging to a node this VM has never spoken to, written
+# out one field at a time. Nothing here calls a BIF that makes pids. These are
+# bytes, and the VM turns bytes into a term.
+node_name = "a@b"
+
+pid_bytes =
+  <<131, 88, 119, byte_size(node_name), node_name::binary, 1::32, 0::32, 7::32>>
+
+pid = :erlang.binary_to_term(pid_bytes)
+
+IO.puts("is a pid:      #{is_pid(pid)}")
+IO.puts("its node:      #{inspect(node(pid))}")
+IO.puts("round trips:   #{:erlang.term_to_binary(pid) == pid_bytes}")
+
+# Same node, same id, same serial, one different byte in creation.
+other = :erlang.binary_to_term(<<131, 88, 119, 3, "a@b", 1::32, 0::32, 8::32>>)
+
+IO.puts("")
+IO.puts("same node and id, creation 7 against creation 8")
+IO.puts("equal:         #{pid == other}")
+IO.puts("same node:     #{node(pid) == node(other)}")
+
+# A reference for the same node, three words of identifier.
+ref_bytes = <<131, 90, 3::16, 119, 3, "a@b", 7::32, 1::32, 2::32, 3::32>>
+ref = :erlang.binary_to_term(ref_bytes)
+
+IO.puts("")
+IO.puts("is a reference: #{is_reference(ref)}")
+IO.puts("round trips:    #{:erlang.term_to_binary(ref) == ref_bytes}")
+```
+
+```
+is a pid:      true
+its node:      :a@b
+round trips:   true
+
+same node and id, creation 7 against creation 8
+equal:         false
+same node:     true
+
+is a reference: true
+round trips:    true
+```
+
+`NEW_PID_EXT` is tag 88 and its fields are a node name as an atom, a 32 bit id, a 32 bit serial and a 32 bit creation, at `erts/doc/guides/erl_ext_dist.md:431-450@OTP-29.0.5`. Three of those four are what you would guess. The fourth is the one that matters operationally.
+
+Creation is a number the node picks when it starts. Two pids with the same node name, the same id and the same serial but different creations are different pids and will never be equal. That is what stops a message addressed to process 1 on a node that crashed from being delivered to process 1 on the node that replaced it. The pid you are holding from before a restart does not silently start pointing at a stranger. It stops matching anything.
+
+Which is also why `term_to_binary/1` on your own pid does not survive the distribution being started or stopped. Starting distribution changes the node name and the creation, so the old bytes name a node that no longer exists. The `local` option further down exists for exactly this problem.
+
+## Two different ideas of a small integer
+
+The heap has a boundary where an integer stops fitting in a word and becomes a boxed bignum. The wire has a boundary where an integer stops fitting in a fixed width field and becomes a bignum. They are in different places and neither one knows about the other.
+
+<!-- cell: integers -->
+
+```elixir
+tag = fn n -> :binary.at(:erlang.term_to_binary(n), 1) end
+wire = fn n -> byte_size(:erlang.term_to_binary(n)) end
+heap = &:erts_debug.flat_size/1
+
+# The two sides of every boundary that matters for an integer, written as the
+# boundary rather than as a literal, so a reader can see which power of two it
+# is without counting digits.
+edges = [
+  {"255", 255},
+  {"256", 256},
+  {"2^31 - 1", 2_147_483_647},
+  {"2^31", 2_147_483_648},
+  {"-2^31", -2_147_483_648},
+  {"-2^31 - 1", -2_147_483_649},
+  {"2^59 - 1", 576_460_752_303_423_487},
+  {"2^59", 576_460_752_303_423_488},
+  {"2^64", 18_446_744_073_709_551_616}
+]
+
+IO.puts("integer        wire  heap  tag")
+
+for {label, n} <- edges do
+  IO.puts(
+    String.pad_trailing(label, 13) <>
+      String.pad_leading(to_string(wire.(n)), 5) <>
+      String.pad_leading(to_string(heap.(n)), 6) <>
+      String.pad_leading(to_string(tag.(n)), 5)
+  )
+end
+```
+
+```
+integer        wire  heap  tag
+255              3     0   97
+256              6     0   98
+2^31 - 1         6     0   98
+2^31             8     0  110
+-2^31            6     0   98
+-2^31 - 1        8     0  110
+2^59 - 1        12     0  110
+2^59            12     2  110
+2^64            13     3  110
+```
+
+Three boundaries, and only one of them is where you would put it.
+
+At 256 the encoding stops being one byte and becomes a signed 32 bit field. That is `SMALL_INTEGER_EXT`, tag 97, giving way to `INTEGER_EXT`, tag 98, and it is the reason a list of bytes is so much cheaper than a list of numbers that happen to be slightly larger. The one byte form is unsigned, so `-1` does not qualify for it either.
+
+At 2 to the 31 the 32 bit field runs out and the encoding becomes `SMALL_BIG_EXT`, which is a length, a sign byte and then base 256 digits least significant first. Nothing about the machine has changed at that number. It is where a four byte signed field ends.
+
+At 2 to the 59 the heap column moves and the wire column does not. That is the boundary from the lesson on what a term costs, four tag bits taken out of a 64 bit word. Everything between 2 to the 31 and 2 to the 59 is free on the heap and a bignum on the wire, which is a range about 268 million times wider than the whole 32 bit integer range. Timestamps in nanoseconds live in it. So do most identifiers people generate from a counter.
+
+None of this is a bug and none of it costs much. It is worth knowing because the two boundaries get confused for each other constantly, and because a bignum on the wire is a length byte and a sign byte of overhead rather than something dramatic.
+
+## Atoms, where characters and bytes stop agreeing
+
+An atom name is limited to 255 characters. The short tag on the wire has a one byte length field, so it is limited to 255 bytes. Those are different limits and a multibyte atom can sit between them.
+
+<!-- cell: atoms -->
+
+```elixir
+# The atom name limit is counted in characters and the wire tag is chosen by
+# byte count, so an atom can be well inside the name limit and still be too long
+# for the short tag. Every row below is built from a repeated character, so the
+# character count is exact and the byte count follows from the encoding.
+row = fn label, name ->
+  a = String.to_atom(name)
+  bytes = :erlang.term_to_binary(a)
+  <<131, tag, _rest::binary>> = bytes
+
+  IO.puts(
+    String.pad_trailing(label, 26) <>
+      String.pad_leading(to_string(String.length(name)), 6) <>
+      String.pad_leading(to_string(byte_size(name)), 7) <>
+      String.pad_leading(to_string(byte_size(bytes)), 6) <>
+      String.pad_leading(to_string(tag), 5)
+  )
+end
+
+IO.puts("atom                        chars  bytes  wire  tag")
+row.("one letter", "a")
+row.("254 letters", String.duplicate("a", 254))
+row.("255 letters", String.duplicate("a", 255))
+row.("127 two byte characters", String.duplicate("é", 127))
+row.("128 two byte characters", String.duplicate("é", 128))
+row.("255 two byte characters", String.duplicate("é", 255))
+
+IO.puts("")
+
+# The name limit itself, from the other side. This is the same 255 the term
+# lesson found, and it is still characters rather than bytes.
+try do
+  String.to_atom(String.duplicate("é", 256))
+rescue
+  e -> IO.puts("256 two byte characters: #{Exception.message(e)}")
+end
+```
+
+```
+atom                        chars  bytes  wire  tag
+one letter                     1      1     4  119
+254 letters                  254    254   257  119
+255 letters                  255    255   258  119
+127 two byte characters      127    254   257  119
+128 two byte characters      128    256   260  118
+255 two byte characters      255    510   514  118
+
+256 two byte characters: a system limit has been reached
+```
+
+An atom of 255 plain letters uses the short tag. An atom of 128 accented characters is only half as long by the rule that governs atom names, and it does not, because 256 bytes will not fit in a one byte length. `SMALL_ATOM_UTF8_EXT` at tag 119 gives way to `ATOM_UTF8_EXT` at tag 118, which has a two byte length and three bytes of overhead instead of two.
+
+The 255 in the standard at `erts/doc/guides/erl_ext_dist.md:88-89@OTP-29.0.5` is characters, and it says plainly that each character can need four bytes. So the widest atom name the VM will accept is 1020 bytes, comfortably inside the two byte field, and the format has room it will never need.
+
+Both deprecated latin1 tags are still in the table for a reason. `ATOM_EXT` at tag 100 and `SMALL_ATOM_EXT` at tag 115 are what a pre OTP 20 node sent, and a decoder that wants to read old data still has to handle them. Nothing running today emits them unless you ask for `minor_version: 0`, which is further down.
+
+## The cliff at 65535
+
+`STRING_EXT` has a two byte length field. That is a hard ceiling, and one element past it the encoding falls back to the general one.
+
+<!-- cell: strings -->
+
+```elixir
+wire = fn t -> byte_size(:erlang.term_to_binary(t)) end
+tag = fn t -> :binary.at(:erlang.term_to_binary(t), 1) end
+
+row = fn label, term ->
+  IO.puts(
+    String.pad_trailing(label, 30) <>
+      String.pad_leading(to_string(wire.(term)), 8) <>
+      String.pad_leading(to_string(tag.(term)), 5)
+  )
+end
+
+IO.puts("list                              wire  tag")
+row.("[1, 2, 3]", [1, 2, 3])
+row.("[1, 2, 300]", [1, 2, 300])
+row.("[1, 2, :three]", [1, 2, :three])
+row.("65534 bytes", List.duplicate(1, 65_534))
+row.("65535 bytes", List.duplicate(1, 65_535))
+row.("65536 bytes", List.duplicate(1, 65_536))
+
+IO.puts("")
+
+# One element more and the wire size doubles. Nothing about the list changed.
+# The length field in the tag that was being used ran out of room.
+short = List.duplicate(1, 65_535)
+long = List.duplicate(1, 65_536)
+IO.puts("one element added, #{wire.(long) - wire.(short)} bytes added")
+IO.puts("bytes per element before: #{Float.round(wire.(short) / 65_535, 3)}")
+IO.puts("bytes per element after:  #{Float.round(wire.(long) / 65_536, 3)}")
+
+IO.puts("")
+
+# STRING_EXT is not a string. It decodes to the list of integers it came from.
+IO.puts("what comes back: #{inspect(:erlang.binary_to_term(:erlang.term_to_binary([104, 105])))}")
+```
+
+```
+list                              wire  tag
+[1, 2, 3]                            7  107
+[1, 2, 300]                         16  108
+[1, 2, :three]                      18  108
+65534 bytes                      65538  107
+65535 bytes                      65539  107
+65536 bytes                     131079  108
+
+one element added, 65540 bytes added
+bytes per element before: 1.0
+bytes per element after:  2.0
+
+what comes back: ~c"hi"
+```
+
+One element is added and the message grows by 65540 bytes. That is the whole list being rewritten with a tag byte in front of every element, plus the nil at the end. The standard says so directly at `erts/doc/guides/erl_ext_dist.md:503-513@OTP-29.0.5`: implementations must ensure that lists longer than 65535 elements are encoded as `LIST_EXT`.
+
+There is no equivalent cliff for binaries. `BINARY_EXT` has a four byte length and a binary of a hundred thousand bytes is a hundred thousand bytes on the wire plus six. If you are sending byte data of a size anywhere near this boundary, the difference between holding it as a list and holding it as a binary is a factor of two on the network, and it is a factor of eight in memory before you send anything.
+
+The last line is a reminder that `STRING_EXT` is not a string type. Erlang has no string type. The tag is an optimisation for lists of small integers and what comes back out is the list that went in.
+
+## Maps, and the order nobody promised you
+
+A map has no order. The encoder has to write the pairs in some order anyway. The question is which one, and the answer is more interesting than it looks.
+
+<!-- cell: maps -->
+
+```elixir
+# Two atoms this VM has not seen before, created in the opposite of their
+# alphabetical order. Which one comes first on the wire is the whole question.
+first_made = String.to_atom("zzz made first")
+second_made = String.to_atom("aaa made second")
+pair = %{first_made => 1, second_made => 2}
+
+names = fn opts ->
+  <<131, 116, _arity::32, rest::binary>> = :erlang.term_to_binary(pair, opts)
+  for <<119, n, name::binary-size(n), 97, _v <- rest>>, do: name
+end
+
+IO.puts("term order puts them:  #{inspect(Enum.sort([first_made, second_made]))}")
+IO.puts("on the wire, default:  #{inspect(names.([]))}")
+IO.puts("with deterministic:    #{inspect(names.([:deterministic]))}")
+
+# Forty pairs, every key and value a single byte integer, so the pairs on the
+# wire are four bytes each and a comprehension can read the key order straight
+# out of them without needing a decoder.
+big = Map.new(1..40, fn i -> {i, i} end)
+
+keys = fn opts ->
+  <<131, 116, _arity::32, pairs::binary>> = :erlang.term_to_binary(big, opts)
+  for <<97, k, 97, _v <- pairs>>, do: k
+end
+
+IO.puts("")
+IO.puts("forty pairs, default:")
+IO.puts("  #{inspect(keys.([]))}")
+IO.puts("forty pairs, deterministic:")
+IO.puts("  #{inspect(keys.([:deterministic]))}")
+
+IO.puts("")
+
+# Within one VM the order does not depend on how the map was built.
+a = %{a: 1, b: 2, c: 3}
+b = %{c: 3, b: 2, a: 1}
+c = Enum.into([b: 2, a: 1, c: 3], %{})
+
+same_small =
+  :erlang.term_to_binary(a) == :erlang.term_to_binary(b) and
+    :erlang.term_to_binary(b) == :erlang.term_to_binary(c)
+
+up = Map.new(1..40, fn i -> {i, i} end)
+down = Map.new(40..1//-1, fn i -> {i, i} end)
+same_big = :erlang.term_to_binary(up) == :erlang.term_to_binary(down)
+
+IO.puts("three pairs, three build orders, same bytes: #{same_small}")
+IO.puts("forty pairs, both directions, same bytes:    #{same_big}")
+```
+
+```
+term order puts them:  [:"aaa made second", :"zzz made first"]
+on the wire, default:  ["zzz made first", "aaa made second"]
+with deterministic:    ["aaa made second", "zzz made first"]
+
+forty pairs, default:
+  [39, 22, 26, 27, 5, 21, 30, 16, 3, 33, 14, 40, 37, 24, 17, 11, 6, 20, 28, 25, 1, 32, 36, 35, 15, 9, 23, 10, 8, 31, 38, 7, 2, 13, 29, 19, 12, 34, 4, 18]
+forty pairs, deterministic:
+  [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40]
+
+three pairs, three build orders, same bytes: true
+forty pairs, both directions, same bytes:    true
+```
+
+The first three lines are the answer to prediction three, and they are worth reading twice.
+
+Two atoms are created, the alphabetically later one first. Term order puts `:"aaa made second"` ahead of `:"zzz made first"`, because atoms compare by their names. The wire puts them the other way round. The order the pairs come out in follows the order the atoms were created in this VM, not any property of the map and not any property of the keys.
+
+Which means two nodes running the same release, with the same map in memory, encode it to different bytes if their modules happened to load in a different order. Not sometimes. Routinely. Anything that hashes or signs or compares `term_to_binary/1` output containing a map is resting on something that was never promised.
+
+The forty pair map is the same story with a different mechanism. Above 32 pairs a map is a hash array mapped trie rather than a flat pair of tuples, and the wire order becomes the order the trie happens to walk. It is not sorted, it is not insertion order, and it is not the order the small map used.
+
+The `deterministic` option, added in OTP 24.1 and documented at `erts/preloaded/src/erlang.erl:10057-10061@OTP-29.0.5`, sorts the pairs into term order before writing them. Both cases above come out sorted with it. The implementation is a sorting pass through the encoder at `erts/emulator/beam/external.c:3418@OTP-29.0.5`, entered from the flat map case and the two hash map cases, so it is one mechanism covering every map shape.
+
+The last two lines are the part that makes this hard to catch. Within one VM the encoding is stable, so a test that builds a map three ways and compares the bytes passes. It has proved that the encoder is a function of the map, which is true. It has not proved that the function is the same one on the other node, which is what you needed.
+
+The documentation for `deterministic` is careful about what it does promise. The same encoded representation for the same term, within the same major release. Between major releases, nothing.
+
+## Three options that change the bytes
+
+`term_to_binary/2` takes options and three of them change what comes out.
+
+<!-- cell: options -->
+
+```elixir
+tb = &:erlang.term_to_binary/2
+repetitive = :binary.copy("abcd", 1000)
+
+IO.puts("compression")
+plain = :erlang.term_to_binary(repetitive)
+squashed = tb.(repetitive, [:compressed])
+IO.puts("  4000 repeated bytes, plain #{byte_size(plain)}, compressed #{byte_size(squashed)}")
+IO.puts("  first six bytes: #{inspect(:binary.bin_to_list(squashed) |> Enum.take(6))}")
+<<131, 80, size::32, _rest::binary>> = squashed
+IO.puts("  the size field says #{size}, which is the plain form without its version byte")
+IO.puts("  round trips: #{:erlang.binary_to_term(squashed) == repetitive}")
+
+# Compression that would make the term bigger is not used, and there is no flag
+# in the output saying so. The tag is the ordinary one.
+IO.puts("  asking for compression on :ok gives #{byte_size(tb.(:ok, [:compressed]))} bytes, tag #{:binary.at(tb.(:ok, [:compressed]), 1)}")
+
+IO.puts("")
+IO.puts("minor version 0, which is what the format looked like before OTP R11B-4")
+old_float = tb.(1.0, minor_version: 0)
+IO.puts("  1.0 today: #{inspect(:binary.bin_to_list(:erlang.term_to_binary(1.0)))}")
+IO.puts("  1.0 then:  #{byte_size(old_float)} bytes, tag #{:binary.at(old_float, 1)}, text #{inspect(binary_part(old_float, 2, 26))}")
+IO.puts("  :ok then:  #{inspect(:binary.bin_to_list(tb.(:ok, minor_version: 0)))}")
+
+IO.puts("")
+IO.puts("the local option")
+mine = make_ref()
+local = tb.(mine, [:local])
+theirs = :erlang.binary_to_term(<<131, 90, 3::16, 119, 3, "a@b", 7::32, 1::32, 2::32, 3::32>>)
+
+IO.puts("  tag: #{:binary.at(local, 1)}")
+IO.puts("  then four bytes of hash, and at offset 6 an ordinary reference, tag #{:binary.at(local, 6)}")
+IO.puts("  that reference has #{:binary.at(local, 9)} where its node name goes, which is NIL_EXT")
+IO.puts("  so a reference of your own costs #{byte_size(local)} bytes with local, whatever your node is called")
+IO.puts("  a reference from a@b: #{byte_size(:erlang.term_to_binary(theirs))} bytes plain, #{byte_size(tb.(theirs, [:local]))} with local")
+IO.puts("  round trips here: #{:erlang.binary_to_term(local) == mine}")
+```
+
+```
+compression
+  4000 repeated bytes, plain 4006, compressed 44
+  first six bytes: [131, 80, 0, 0, 15, 165]
+  the size field says 4005, which is the plain form without its version byte
+  round trips: true
+  asking for compression on :ok gives 5 bytes, tag 119
+
+minor version 0, which is what the format looked like before OTP R11B-4
+  1.0 today: [131, 70, 63, 240, 0, 0, 0, 0, 0, 0]
+  1.0 then:  33 bytes, tag 99, text "1.00000000000000000000e+00"
+  :ok then:  [131, 100, 0, 2, 111, 107]
+
+the local option
+  tag: 121
+  then four bytes of hash, and at offset 6 an ordinary reference, tag 90
+  that reference has 106 where its node name goes, which is NIL_EXT
+  so a reference of your own costs 26 bytes with local, whatever your node is called
+  a reference from a@b: 25 bytes plain, 30 with local
+  round trips here: true
+```
+
+Compression is a wrapper rather than a tag of its own. The version byte, then 80, then a four byte uncompressed size, then a zlib stream, at `erts/doc/guides/erl_ext_dist.md:57-69@OTP-29.0.5`. Inside the stream is the ordinary encoding without its version byte, which is why the size field says 4005 for a term that is 4006 bytes uncompressed.
+
+Asking for compression on something that will not compress gives you the plain encoding back with the plain tag. There is no marker saying compression was attempted and declined, so a decoder never has to care and a reader of the bytes cannot tell the difference. If you have wondered whether it is safe to turn compression on for everything, that is the answer to half the question. The other half is that you have paid for a zlib pass over every term either way.
+
+Minor version 0 is the format before R11B-4 and it is worth one look. A float was thirty one bytes of text, produced with a printf format string and read back with scanf, and the value 1.0 becomes the twenty six characters shown padded out with zeroes. Today it is the eight bytes of the IEEE double, and a float went from 33 bytes on the wire to 10. Atoms in that mode go out as latin1 with tag 100 where they can.
+
+The `local` option is the answer to the problem the pid section raised. The tag is 121, followed by four bytes that identify this runtime instance, followed by an ordinary encoding in which the node name has been replaced by `NIL_EXT`. The node name is not written down at all, so nothing about the encoding depends on what your node is called or on the creation it picked at boot. A reference from another node still carries that node's name, because there is no way to leave out something the local runtime is not the authority on.
+
+## Decoding something you did not send
+
+Every cell so far has decoded bytes that came from the same VM. The interesting case is bytes that came from somewhere else.
+
+<!-- cell: untrusted -->
+
+```elixir
+# An atom name chosen so that this VM has never seen it. The bytes are written
+# by hand for the same reason: calling String.to_atom here would create the atom
+# and spoil the demonstration.
+name = "no one has ever typed this atom"
+bytes = <<131, 119, byte_size(name), name::binary>>
+
+known? = fn ->
+  try do
+    :erlang.binary_to_existing_atom(name, :utf8)
+    true
+  rescue
+    ArgumentError -> false
+  end
+end
+
+IO.puts("in the atom table to start with: #{known?.()}")
+
+safe = fn ->
+  try do
+    :erlang.binary_to_term(bytes, [:safe])
+    "accepted"
+  rescue
+    ArgumentError -> "refused"
+  end
+end
+
+IO.puts("binary_to_term with safe:        #{safe.()}")
+IO.puts("binary_to_term without safe:     #{inspect(:erlang.binary_to_term(bytes))}")
+IO.puts("in the atom table now:           #{known?.()}")
+IO.puts("binary_to_term with safe again:  #{safe.()}")
+
+IO.puts("")
+
+# Size is not the only thing to check either. A compressed term is small on the
+# wire and whatever it wants to be once decoded.
+bomb = :erlang.term_to_binary(:binary.copy("abcd", 1000), [:compressed])
+IO.puts("#{byte_size(bomb)} bytes on the wire become #{byte_size(:erlang.binary_to_term(bomb))} bytes of term")
+```
+
+```
+in the atom table to start with: false
+binary_to_term with safe:        refused
+binary_to_term without safe:     :"no one has ever typed this atom"
+in the atom table now:           true
+binary_to_term with safe again:  accepted
+
+44 bytes on the wire become 4000 bytes of term
+```
+
+Thirty one bytes of input added an entry to a table that is never garbage collected, and the fourth line proves it stayed. Do that in a loop from a network socket and the node stops with a system limit on the atom table, which is not a recoverable condition. This is the oldest sharp edge in the format and it is one option away.
+
+The last line of that cell is the other half. `safe` refuses unknown atoms and unknown funs. It does not put a bound on how large the decoded term is, and a compressed term is small on the wire and as large as it likes afterwards. Forty four bytes became four thousand here, and the ratio is a property of zlib rather than a property of the format.
+
+This cell only tells the truth in a fresh runtime. Run it a second time and the first two lines change, because the atom exists now. That is not a flaw in the demonstration. It is the demonstration.
+
+## Boss fight
+
+Write the encoder.
+
+`boss.exs` sits next to this notebook. It holds a corpus of forty four terms and no expected bytes at all. For each term it asks the VM what the encoding is, asks your function what the encoding is, and if the two binaries differ it tells you the offset where they first part company and shows you both. That is a differential oracle, and it is the reason you do not need a table of correct answers to know whether you are right.
+
+Save the notebook to disk first if you have not, because `__DIR__` is how the cell finds the file.
+
+The comparison is against `term_to_binary(term, [:deterministic])`, for the reason the map section gave. Without that option there is no fixed answer to compare against.
+
+The corpus has no pids, references or funs in it. Those need a node name and a creation, and the encoding of a fun needs the MD5 of a compiled module, none of which belong in the first encoder anybody writes.
+
+<!-- cell: boss -->
+
+```elixir
+Code.require_file("boss.exs", __DIR__)
+
+defmodule MyEncoder do
+  def encode(term), do: <<131>> <> body(term)
+
+  # Two clauses to start you off, and they are the two easiest ones in the
+  # format.
+  defp body(i) when is_integer(i) and i >= 0 and i <= 255, do: <<97, i>>
+
+  defp body(a) when is_atom(a) do
+    name = Atom.to_string(a)
+    <<119, byte_size(name)>> <> name
+  end
+
+  # And a third that looks right and is not. It is here so that the first run
+  # shows you what a mismatch reads like rather than only what a missing clause
+  # reads like. Fix it once you have seen it.
+  defp body(b) when is_binary(b), do: <<109, byte_size(b)::16>> <> b
+end
+
+Boss.Grader.check(&MyEncoder.encode/1)
+```
+
+```
+44 terms in the corpus
+10 match the VM byte for byte
+34 do not
+
+6 of them, spread across the corpus:
+  256                           raised FunctionClauseError
+  -2147483649                   raised FunctionClauseError
+  -0.5                          raised FunctionClauseError
+  <<0, 255>>                    first differs at byte 3
+      yours ... 109 0 2 0 255
+      the VM ... 109 0 0 0 2 0 255
+  [1, 2, 300]                   raised FunctionClauseError
+  %{}                           raised FunctionClauseError
+
+Read the byte where they first differ, look that tag up in the standard,
+and fix one clause at a time. The oracle is not going anywhere.
+```
+
+A complete encoder for this corpus is about fifty lines. Every tag you need has been in this lesson except two, and both of those are in the standard where you would look for them.
+
+Some of the corpus is there to catch specific mistakes. The empty atom. The improper list. A bignum with more than 255 base 256 digits, which needs the four byte length field rather than the one byte one. A list of small integers that has to become `STRING_EXT` next to one that must not. A map whose three keys are an integer, an atom and a binary, which has to come out in term order rather than in the order you iterated it.
+
+When it passes, you have written a program that agrees with the emulator on every byte of forty four terms, checked against the emulator rather than against a fixture. That is a stronger statement than any test you could have written by hand, and it took no expected values to make.
+
+## What this lesson did not explain
+
+It did not explain the distribution header, which is the wrapper the real distribution puts in front of these terms. It carries the atom cache, which is how a connection avoids sending `:gen_server` as nine bytes of text every single time, and since OTP 22 it also carries fragmentation for messages too large to send in one piece. That section starts at `erts/doc/guides/erl_ext_dist.md:91-107@OTP-29.0.5` and runs for a quarter of the standard.
+
+It did not explain funs. `NEW_FUN_EXT` carries the MD5 of the significant parts of the beam file, an index, a uniq, the module, the creating pid and the free variables. Sending a fun to a node that does not have that exact module loaded is a whole subject and most of it is about failure.
+
+It did not explain `RECORD_EXT`, tag 67, which is new in OTP 29 and encodes a native record with its module, its name and its field names. It is the newest thing in the standard and there is nothing to compare it against yet.
+
+It did not explain how the decoder allocates. Everything here has been about the bytes rather than about what happens when they arrive, and what happens when they arrive is a heap allocation sized by a first pass over the input.
+
+It did not explain the handshake, the flags the two nodes agree on, or what happens when they disagree. Several tags in the table above exist only because a flag was optional once.
+
+The normative writeup of the format, with the full tag table and the parts skipped here, is `BP-DIST-001`.
+
+## Claims this lesson makes
+
+Every claim below is in the ledger with the cell that backs it, so you can find out how each one was checked rather than taking it on trust.
+
+| Claim | How it is backed |
+| --- | --- |
+| Every encoded term starts with 131 and a tag byte that decides the rest | `CLM-DIST-0001` |
+| A three element list is cheaper on the wire and dearer on the heap than the same tuple | `CLM-DIST-0002` |
+| The wire boundary for a small integer is 2 to the 31 and the heap boundary is 2 to the 59 | `CLM-DIST-0003` |
+| The short atom tag is chosen by bytes while the atom name limit counts characters | `CLM-DIST-0004` |
+| One element past 65535 doubles the wire size of a list of bytes | `CLM-DIST-0005` |
+| Map pair order follows this VM's history, and the deterministic option sorts it | `CLM-DIST-0006` |
+| Compression that would not help is silently not applied | `CLM-DIST-0007` |
+| The local option writes NIL_EXT where a local identifier's node name would go | `CLM-DIST-0008` |
+| Decoding untrusted bytes creates atoms unless you pass safe | `CLM-DIST-0009` |
+| Handwritten bytes decode to a pid for a node this VM has never contacted | `CLM-DIST-0010` |

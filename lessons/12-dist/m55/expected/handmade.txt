@@ -1,0 +1,10 @@
+is a pid:      true
+its node:      :a@b
+round trips:   true
+
+same node and id, creation 7 against creation 8
+equal:         false
+same node:     true
+
+is a reference: true
+round trips:    true
