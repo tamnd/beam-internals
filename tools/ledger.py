@@ -52,8 +52,16 @@ def validate(claims: list[dict]) -> list[str]:
         if not claim.get("by"):
             problems.append(f"{name}: evidence class {evidence} with nothing in `by`")
 
-        if evidence == "observed" and not any(str(item).startswith("cell:") for item in claim.get("by", [])):
-            problems.append(f"{name}: observed, so `by` has to name a cell")
+        # A cell in a lesson and a case in a conformance suite are both somebody
+        # running the thing and writing down what came back, so both count as
+        # having observed it. A case is the stronger of the two, because it runs
+        # in CI on every change and a lesson cell runs when a reader opens the
+        # notebook, but requiring a cell would mean a claim can only be observed
+        # if it happens to be interesting enough to teach.
+        if evidence == "observed" and not any(
+            str(item).startswith(("cell:", "case:")) for item in claim.get("by", [])
+        ):
+            problems.append(f"{name}: observed, so `by` has to name a lesson cell or a conformance case")
 
         if evidence == "contractual" and not any("@OTP-" in str(item) for item in claim.get("by", [])):
             problems.append(f"{name}: contractual, so `by` has to name a cited document")

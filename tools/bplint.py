@@ -42,6 +42,57 @@ LESSON_LINK = re.compile(r"\]\(\.\./?lessons/")
 YIELD_MARKER = re.compile(r"\[yield\]")
 NOT_GUARANTEED = re.compile(r"not guaranteed", re.IGNORECASE)
 
+# Leaving draft is the one status change with a gate on it. The template says a
+# blueprint with no test ids stays at draft, and this is that sentence made
+# enforceable, because a status field nobody checks is a status field everybody
+# raises.
+NEEDS_A_SUITE = {"reviewed", "stable"}
+SUITES = Path("conformance/suites")
+
+
+def suite_path(conformance_id: str) -> Path:
+    return SUITES / (conformance_id.lower().replace("-", "_") + ".erl")
+
+
+def section_body(text: str, number: int) -> str:
+    """The body of one numbered section, without its own heading line.
+
+    Without that last part the yield rule below never fires, because the
+    heading of section 4 is "Invariants, ordering guarantees and yield points"
+    and a search for "yield point" finds it every time. A rule that always
+    passes is not a weaker rule, it is a rule that is not there.
+    """
+    start = text.find(f"## {number}.")
+    if start < 0:
+        return ""
+    after_heading = text.find("\n", start)
+    if after_heading < 0:
+        return ""
+    end = text.find(f"## {number + 1}.", after_heading)
+    return text[after_heading:end] if end >= 0 else text[after_heading:]
+
+
+def check_promotion(path: Path, text: str, head: str, status: str | None) -> list[str]:
+    """A blueprint past draft has to have something that can fail."""
+    if status not in NEEDS_A_SUITE:
+        return []
+
+    named = re.search(r"^Conformance:\s*(\S+)", head, re.MULTILINE)
+    if not named:
+        return [f"{path}: status {status} with no Conformance id in the header"]
+
+    conformance_id = named.group(1)
+    problems: list[str] = []
+
+    suite = suite_path(conformance_id)
+    if not suite.exists():
+        problems.append(f"{path}: status {status}, so {suite} has to exist")
+
+    if conformance_id not in section_body(text, 7):
+        problems.append(f"{path}: status {status}, so section 7 has to name {conformance_id}")
+
+    return problems
+
 
 def check(path: Path) -> list[str]:
     problems: list[str] = []
@@ -61,6 +112,8 @@ def check(path: Path) -> list[str]:
         if f"## {section}" not in text:
             problems.append(f"{path}: missing section {index + 1}, {section}")
 
+    problems.extend(check_promotion(path, text, head, status.group(1) if status else None))
+
     body_start = text.find("## 1. Scope")
     body = text[body_start:] if body_start >= 0 else text
 
@@ -70,19 +123,17 @@ def check(path: Path) -> list[str]:
         if LESSON_LINK.search(line):
             problems.append(f"{path}: links into lessons/, which a blueprint may not do")
 
-    if "## 4." in text:
-        section4 = text.split("## 4.", 1)[1].split("## 5.", 1)[0]
-        if "ORD-" in section4 and not NOT_GUARANTEED.search(section4):
-            problems.append(
-                f"{path}: section 4 states an ordering guarantee with no boundary. "
-                "Every guarantee needs at least one line saying what is not guaranteed."
-            )
+    section3 = section_body(text, 3)
+    section4 = section_body(text, 4)
 
-    if "## 3." in text and "## 4." in text:
-        section3 = text.split("## 3.", 1)[1].split("## 4.", 1)[0]
-        section4 = text.split("## 4.", 1)[1].split("## 5.", 1)[0]
-        if YIELD_MARKER.search(section3) and "yield point" not in section4.lower():
-            problems.append(f"{path}: section 3 marks a yield and section 4 does not list it")
+    if "ORD-" in section4 and not NOT_GUARANTEED.search(section4):
+        problems.append(
+            f"{path}: section 4 states an ordering guarantee with no boundary. "
+            "Every guarantee needs at least one line saying what is not guaranteed."
+        )
+
+    if YIELD_MARKER.search(section3) and "yield point" not in section4.lower():
+        problems.append(f"{path}: section 3 marks a yield and section 4 does not list it")
 
     return problems
 

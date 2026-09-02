@@ -58,6 +58,16 @@ site-serve: site-stage
 site-build: site-stage
     mkdocs build --strict --config-file site/mkdocs.yml
 
+# The conformance suites, against whatever release is on the path. Needs an
+# Erlang release and nothing else, which is the whole design of the runner. Not
+# part of `check`, because `check` has to run on a machine with no Erlang.
+conformance *suites:
+    ./conformance/run.escript {{ suites }}
+
+# What exists, without running any of it.
+conformance-list:
+    ./conformance/run.escript --list
+
 # Read upstream and report what has moved away from the pin. Exits 1 when
 # something has, which is what the weekly job turns into an issue.
 drift:
