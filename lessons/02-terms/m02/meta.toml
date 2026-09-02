@@ -1,0 +1,61 @@
+id = "m02"
+title = "What a term costs"
+part = "02-terms"
+pass = "mechanic"
+
+# The milestone plan says Tier 1 for this lesson, and it came out at Tier 0.
+# Every measurement in it runs on a stock release install through
+# `erts_debug:flat_size/1`, which is in the shipped emulator and needs no build
+# flags, no root and no repository checkout. Claiming a tier the lesson does not
+# need would put a barrier in front of a reader for no reason, so the tier is
+# recorded as what it is and the divergence from the plan is written here rather
+# than left for somebody to notice later.
+env = "T0"
+requires = ["otp-29", "livebook"]
+
+duration_minutes = 30
+deps = []
+blueprint = "BP-TERM-001"
+boss = "boss.exs"
+
+claims = [
+  "CLM-TERM-0003",
+  "CLM-TERM-0004",
+  "CLM-TERM-0005",
+  "CLM-TERM-0006",
+  "CLM-TERM-0007",
+  "CLM-TERM-0008",
+  "CLM-TERM-0009",
+]
+
+# The prediction gate. Two of the three have answers most readers get wrong, and
+# the third is the one nobody guesses.
+predictions = [
+  "How many heap words does 42 cost, and how many does a twenty two digit integer cost?",
+  "A 64 byte binary and a 65 byte binary, which costs more heap words?",
+  "Sort [[], {}, %{}, [:a]]. Which comes first and which comes last?",
+]
+
+[bake]
+# Cells whose output is identical on every machine, so CI can compare them.
+deterministic = [
+  "sizes",
+  "bisect",
+  "shapes",
+  "threshold",
+  "empty",
+  "order",
+  "boss",
+]
+
+# The banner prints the build you are sitting on, so it is run to check it does
+# not crash and its output is not compared.
+timing_only = ["banner"]
+
+[verified]
+# Both architectures, both on the pinned release, running the same cells pulled
+# straight out of the notebook.
+"aarch64-darwin" = "OTP 29 erts-17.0.5, Elixir 1.20.4"
+"x86_64-linux" = "OTP 29 erts-17.0.5, Elixir 1.20.4"
+on = 2026-09-02
+by = "tamnd"

@@ -1,0 +1,8 @@
+largest free integer   576460752303423487
+smallest free integer  -576460752303423488
+one past the top       576460752303423488 costs 2 words
+one past the bottom    -576460752303423489 costs 2 words
+
+the free range holds   1152921504606846976 values
+which is two to the    60
+and a word is          64 bits

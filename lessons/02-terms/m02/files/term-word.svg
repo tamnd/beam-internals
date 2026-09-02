@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="650" viewBox="0 0 1620 650" font-family="Helvetica, Arial, sans-serif">
+<rect width="1620" height="650" fill="#ffffff"/>
+<text x="60" y="56" font-size="20" fill="#1e1e1e">One word, and the bits at the bottom that say what it holds</text>
+<text x="60" y="82" font-size="14" fill="#868e96">Every Erlang term is one machine word. The low bits are the tag. What is left is the payload.</text>
+<text x="250" y="124" font-size="12" fill="#868e96">high bits</text>
+<text x="1280" y="124" font-size="12" fill="#868e96" text-anchor="end">bit 0</text>
+<text x="235" y="179" font-size="14" fill="#1e1e1e" text-anchor="end">a header on the heap</text>
+<rect x="250" y="150" width="950" height="44" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.2"/>
+<text x="725.0" y="178" font-size="13" fill="#868e96" text-anchor="middle">arity, and a subtag saying which kind</text>
+<rect x="1200" y="150" width="40" height="44" fill="#a5d8ff" stroke="#1971c2" stroke-width="1.4"/>
+<text x="1220.0" y="179" font-size="16" fill="#1971c2" text-anchor="middle">0</text>
+<rect x="1240" y="150" width="40" height="44" fill="#a5d8ff" stroke="#1971c2" stroke-width="1.4"/>
+<text x="1260.0" y="179" font-size="16" fill="#1971c2" text-anchor="middle">0</text>
+<text x="1300" y="178" font-size="13" fill="#868e96">not a term, the first word of a boxed one</text>
+<text x="235" y="247" font-size="14" fill="#1e1e1e" text-anchor="end">a pointer to a cons cell</text>
+<rect x="250" y="218" width="950" height="44" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.2"/>
+<text x="725.0" y="246" font-size="13" fill="#868e96" text-anchor="middle">address of two words on some heap</text>
+<rect x="1200" y="218" width="40" height="44" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.4"/>
+<text x="1220.0" y="247" font-size="16" fill="#2f9e44" text-anchor="middle">0</text>
+<rect x="1240" y="218" width="40" height="44" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.4"/>
+<text x="1260.0" y="247" font-size="16" fill="#2f9e44" text-anchor="middle">1</text>
+<text x="1300" y="246" font-size="13" fill="#868e96">head and tail live there</text>
+<text x="235" y="315" font-size="14" fill="#1e1e1e" text-anchor="end">a pointer to a boxed term</text>
+<rect x="250" y="286" width="950" height="44" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.2"/>
+<text x="725.0" y="314" font-size="13" fill="#868e96" text-anchor="middle">address of a header word</text>
+<rect x="1200" y="286" width="40" height="44" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.4"/>
+<text x="1220.0" y="315" font-size="16" fill="#2f9e44" text-anchor="middle">1</text>
+<rect x="1240" y="286" width="40" height="44" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.4"/>
+<text x="1260.0" y="315" font-size="16" fill="#2f9e44" text-anchor="middle">0</text>
+<text x="1300" y="314" font-size="13" fill="#868e96">tuple, float, big integer, map, bitstring</text>
+<text x="235" y="383" font-size="14" fill="#1e1e1e" text-anchor="end">a small integer</text>
+<rect x="250" y="354" width="870" height="44" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.2"/>
+<text x="685.0" y="382" font-size="13" fill="#868e96" text-anchor="middle">60 bits of value, signed</text>
+<rect x="1120" y="354" width="40" height="44" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.4"/>
+<text x="1140.0" y="383" font-size="16" fill="#e8590c" text-anchor="middle">1</text>
+<rect x="1160" y="354" width="40" height="44" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.4"/>
+<text x="1180.0" y="383" font-size="16" fill="#e8590c" text-anchor="middle">1</text>
+<rect x="1200" y="354" width="40" height="44" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.4"/>
+<text x="1220.0" y="383" font-size="16" fill="#e8590c" text-anchor="middle">1</text>
+<rect x="1240" y="354" width="40" height="44" fill="#ffd8a8" stroke="#e8590c" stroke-width="1.4"/>
+<text x="1260.0" y="383" font-size="16" fill="#e8590c" text-anchor="middle">1</text>
+<text x="1300" y="382" font-size="13" fill="#868e96">no heap, the number is the term</text>
+<text x="235" y="451" font-size="14" fill="#1e1e1e" text-anchor="end">an atom</text>
+<rect x="250" y="422" width="790" height="44" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.2"/>
+<text x="645.0" y="450" font-size="13" fill="#868e96" text-anchor="middle">index into the atom table</text>
+<rect x="1040" y="422" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1060.0" y="451" font-size="16" fill="#9c36b5" text-anchor="middle">0</text>
+<rect x="1080" y="422" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1100.0" y="451" font-size="16" fill="#9c36b5" text-anchor="middle">0</text>
+<rect x="1120" y="422" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1140.0" y="451" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<rect x="1160" y="422" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1180.0" y="451" font-size="16" fill="#9c36b5" text-anchor="middle">0</text>
+<rect x="1200" y="422" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1220.0" y="451" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<rect x="1240" y="422" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1260.0" y="451" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<text x="1300" y="450" font-size="13" fill="#868e96">the name is stored once, globally</text>
+<text x="235" y="519" font-size="14" fill="#1e1e1e" text-anchor="end">the empty list</text>
+<rect x="250" y="490" width="790" height="44" fill="#f8f9fa" stroke="#adb5bd" stroke-width="1.2"/>
+<text x="645.0" y="518" font-size="13" fill="#868e96" text-anchor="middle">nothing, the tag is the whole term</text>
+<rect x="1040" y="490" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1060.0" y="519" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<rect x="1080" y="490" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1100.0" y="519" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<rect x="1120" y="490" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1140.0" y="519" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<rect x="1160" y="490" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1180.0" y="519" font-size="16" fill="#9c36b5" text-anchor="middle">0</text>
+<rect x="1200" y="490" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1220.0" y="519" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<rect x="1240" y="490" width="40" height="44" fill="#eebefa" stroke="#9c36b5" stroke-width="1.4"/>
+<text x="1260.0" y="519" font-size="16" fill="#9c36b5" text-anchor="middle">1</text>
+<text x="1300" y="518" font-size="13" fill="#868e96">one value, so it needs no payload</text>
+<text x="60" y="592" font-size="14" fill="#1e1e1e">Two bits decide first. Only the immediate branch reads further, four bits and then six.</text>
+<text x="60" y="616" font-size="14" fill="#868e96">A term whose tag is a pointer costs heap. A term whose tag is the whole answer costs none.</text>
+</svg>

@@ -1,0 +1,11 @@
+elements   tuple   list
+       0       0      0
+       1       2      2
+       2       3      4
+       3       4      6
+       4       5      8
+       5       6     10
+       6       7     12
+
+a tuple of n costs n + 1 words, a list of n costs 2n
+except at n = 0, where the tuple costs 0 rather than 1

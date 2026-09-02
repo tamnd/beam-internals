@@ -1,0 +1,18 @@
+sorted with the standard order, smallest first:
+
+  float
+  integer
+  atom
+  reference
+  fun
+  port
+  pid
+  tuple
+  map
+  the empty list
+  a list with something in it
+  bitstring
+
+[] > {}      true
+[] > %{}     true
+[] < [:a]    true

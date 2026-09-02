@@ -1,0 +1,12 @@
+on a 64 bit build
+
+{:a, :b, :c}      you said   0, the VM says   4   not this time
+[:a, :b, :c]      you said   0, the VM says   6   not this time
+a 65 byte binary  you said   0, the VM says   8   not this time
+the nested term   you said   0, the VM says  20   not this time
+
+Not all of them.
+For the two small ones, count the header and count the slots.
+For the binary, look again at where the 64 byte line falls and which side is cheaper.
+For the nested term, size each field on its own first and add the container last.
+The sizes cell near the top of the notebook has every part you need.
