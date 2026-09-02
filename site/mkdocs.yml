@@ -68,3 +68,4 @@ nav:
       - m02: lessons/m02/index.md
   - Blueprints:
       - BP-SCHED-001: blueprints/BP-SCHED-001.md
+      - BP-TERM-001: blueprints/BP-TERM-001.md
