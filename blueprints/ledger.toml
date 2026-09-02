@@ -21,9 +21,79 @@
 [[claim]]
 id = "CLM-SCHED-0001"
 text = "A process is given a budget of 4000 reductions, not 2000."
-where = ["t07", "BP-SCHED-002#4"]
+where = ["t07", "BP-SCHED-001#4"]
 evidence = "observed"
-by = ["cell:t07/reds-tape", "erts/emulator/beam/erl_vm.h:53@OTP-29.0.5"]
+by = ["cell:t07/ask-the-vm", "erts/emulator/beam/erl_vm.h:53@OTP-29.0.5"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-SCHED-0002"
+text = "erlang:system_info(context_reductions) returns the CONTEXT_REDS constant itself, with no arithmetic in between, so the observable and the source cannot disagree."
+where = ["t07", "BP-SCHED-001#4"]
+evidence = "observed"
+by = [
+  "cell:t07/ask-the-vm",
+  "erts/emulator/beam/erl_bif_info.c:3362@OTP-29.0.5",
+  "erts/emulator/beam/erl_vm.h:53@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-SCHED-0003"
+text = "One reduction is charged when a function is entered and one when a function returns, so a tail recursive loop costs one per iteration and a body recursive loop costs two."
+where = ["t07", "BP-SCHED-001#3"]
+evidence = "observed"
+by = [
+  "cell:t07/per-call",
+  "erts/emulator/beam/jit/arm/instr_common.cpp:3114@OTP-29.0.5",
+  "erts/emulator/beam/jit/arm/instr_call.cpp:51@OTP-29.0.5",
+  "erts/emulator/beam/jit/x86/instr_common.cpp:3233@OTP-29.0.5",
+  "erts/emulator/beam/jit/x86/instr_call.cpp:70@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-SCHED-0004"
+text = "A process running a tail recursive loop is taken off its scheduler once every 4000 iterations, exactly, which ties the budget to the unit by measurement rather than by argument."
+where = ["t07", "BP-SCHED-001#5"]
+evidence = "observed"
+by = ["cell:t07/preemptions"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-SCHED-0005"
+text = "A reduction is not a unit of time. Two loops with the same iteration count and wall clock times five thousand times apart are charged within a quarter of each other."
+where = ["t07", "BP-SCHED-001#7"]
+evidence = "observed"
+by = ["cell:t07/not-time"]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-SCHED-0006"
+text = "CONTEXT_REDS was 2000 until OTP 20.0. The commit that doubled it is the same commit that started charging a reduction on non-tail return, so the change was a change of unit and not a change of generosity."
+where = ["t07"]
+# Source reading, and the source is outside the pinned tree. The pin is one
+# commit deep, so nothing in this repository can resolve a 2016 commit, and
+# there is no way to observe a released VM from nine years ago from inside this
+# one. o04 does the archaeology properly and this entry gets upgraded then.
+evidence = "unobservable"
+by = [
+  "commit:6bcdd45abd97134fddfb5b0307b1d256337b0c67 in erlang/otp, Reduction counting on non-tail return, 2016-12-28",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-SCHED-0007"
+text = "What counts as a return is decided by the compiler. A body call whose result the compiler already knows becomes a tail call and costs one reduction instead of two."
+where = ["t07", "BP-SCHED-001#7"]
+evidence = "observed"
+by = ["cell:t07/compiler-vote"]
 verified = 2026-09-02
 by_whom = "tamnd"
 

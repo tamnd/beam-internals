@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1572" height="476" viewBox="0 0 1572 476" font-family="Helvetica, Arial, sans-serif">
+<rect width="1572" height="476" fill="#ffffff"/>
+<text x="60" y="56" font-size="20" fill="#1e1e1e">One core, four processes, 4000 reductions each</text>
+<text x="60" y="82" font-size="14" fill="#868e96">Each block is one turn. The process leaves when its budget hits zero, not when a timer fires.</text>
+<text x="164" y="144" font-size="14" fill="#868e96">budget spent, back of the queue</text>
+<line x1="158" y1="148" x2="144" y2="164" stroke="#868e96" stroke-width="1.2"/>
+<polygon points="144,166 151,156 155,162" fill="#868e96"/>
+<line x1="50" y1="191.0" x2="1512" y2="191.0" stroke="#dee2e6" stroke-width="1"/>
+<text x="28" y="198" font-size="18" fill="#1971c2">a</text>
+<line x1="50" y1="251.0" x2="1512" y2="251.0" stroke="#dee2e6" stroke-width="1"/>
+<text x="28" y="258" font-size="18" fill="#e8590c">b</text>
+<line x1="50" y1="311.0" x2="1512" y2="311.0" stroke="#dee2e6" stroke-width="1"/>
+<text x="28" y="318" font-size="18" fill="#2f9e44">c</text>
+<line x1="50" y1="371.0" x2="1512" y2="371.0" stroke="#dee2e6" stroke-width="1"/>
+<text x="28" y="378" font-size="18" fill="#9c36b5">d</text>
+<line x1="144" y1="142" x2="144" y2="408" stroke="#adb5bd" stroke-width="1" stroke-dasharray="4 4"/>
+<line x1="236" y1="142" x2="236" y2="408" stroke="#adb5bd" stroke-width="1" stroke-dasharray="4 4"/>
+<line x1="328" y1="142" x2="328" y2="408" stroke="#adb5bd" stroke-width="1" stroke-dasharray="4 4"/>
+<line x1="420" y1="142" x2="420" y2="408" stroke="#adb5bd" stroke-width="1" stroke-dasharray="4 4"/>
+<rect x="60" y="168" width="84" height="46" rx="6" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="80" y="197" font-size="14" fill="#1971c2">4000</text>
+<rect x="152" y="228" width="84" height="46" rx="6" fill="#ffd8a8" stroke="#e8590c" stroke-width="2"/>
+<text x="172" y="257" font-size="14" fill="#e8590c">4000</text>
+<rect x="244" y="288" width="84" height="46" rx="6" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="264" y="317" font-size="14" fill="#2f9e44">4000</text>
+<rect x="336" y="348" width="84" height="46" rx="6" fill="#eebefa" stroke="#9c36b5" stroke-width="2"/>
+<text x="356" y="377" font-size="14" fill="#9c36b5">4000</text>
+<rect x="428" y="168" width="84" height="46" rx="6" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="448" y="197" font-size="14" fill="#1971c2">4000</text>
+<rect x="520" y="228" width="84" height="46" rx="6" fill="#ffd8a8" stroke="#e8590c" stroke-width="2"/>
+<text x="540" y="257" font-size="14" fill="#e8590c">4000</text>
+<rect x="612" y="288" width="84" height="46" rx="6" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="632" y="317" font-size="14" fill="#2f9e44">4000</text>
+<rect x="704" y="348" width="84" height="46" rx="6" fill="#eebefa" stroke="#9c36b5" stroke-width="2"/>
+<text x="724" y="377" font-size="14" fill="#9c36b5">4000</text>
+<rect x="796" y="168" width="84" height="46" rx="6" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="816" y="197" font-size="14" fill="#1971c2">4000</text>
+<rect x="888" y="228" width="84" height="46" rx="6" fill="#ffd8a8" stroke="#e8590c" stroke-width="2"/>
+<text x="908" y="257" font-size="14" fill="#e8590c">4000</text>
+<rect x="980" y="288" width="84" height="46" rx="6" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="1000" y="317" font-size="14" fill="#2f9e44">4000</text>
+<rect x="1072" y="348" width="84" height="46" rx="6" fill="#eebefa" stroke="#9c36b5" stroke-width="2"/>
+<text x="1092" y="377" font-size="14" fill="#9c36b5">4000</text>
+<rect x="1164" y="168" width="84" height="46" rx="6" fill="#a5d8ff" stroke="#1971c2" stroke-width="2"/>
+<text x="1184" y="197" font-size="14" fill="#1971c2">4000</text>
+<rect x="1256" y="228" width="84" height="46" rx="6" fill="#ffd8a8" stroke="#e8590c" stroke-width="2"/>
+<text x="1276" y="257" font-size="14" fill="#e8590c">4000</text>
+<rect x="1348" y="288" width="84" height="46" rx="6" fill="#b2f2bb" stroke="#2f9e44" stroke-width="2"/>
+<text x="1368" y="317" font-size="14" fill="#2f9e44">4000</text>
+<rect x="1440" y="348" width="84" height="46" rx="6" fill="#eebefa" stroke="#9c36b5" stroke-width="2"/>
+<text x="1460" y="377" font-size="14" fill="#9c36b5">4000</text>
+<line x1="60" y1="426" x2="1518" y2="426" stroke="#1e1e1e" stroke-width="1.5"/>
+<polygon points="1518,426 1508,421 1508,431" fill="#1e1e1e"/>
+<text x="60" y="448" font-size="14" fill="#868e96">time</text>
+<text x="1232" y="448" font-size="14" fill="#868e96">all four finish in the same millisecond</text>
+</svg>

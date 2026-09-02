@@ -1,0 +1,528 @@
+# t07 The reduction budget
+
+## Before you start
+
+You need an Erlang/OTP 29 install and Livebook. Nothing else. No emulator build, no repository checkout, no root. Everything here runs against the release you already have.
+
+This lesson takes about twenty five minutes. It was written and measured against Erlang/OTP 29 erts-17.0.5 on both aarch64 and x86-64, both running the JIT.
+
+Run this first so you know what you are sitting on.
+
+<!-- cell: banner -->
+
+```elixir
+IO.puts(:erlang.system_info(:system_version))
+
+IO.puts("otp release        #{:erlang.system_info(:otp_release)}")
+IO.puts("emulator flavor    #{:erlang.system_info(:emu_flavor)}")
+IO.puts("schedulers online  #{:erlang.system_info(:schedulers_online)}")
+IO.puts("word size          #{:erlang.system_info(:wordsize) * 8} bit")
+```
+
+If the flavor says `jit` you are in the same place this lesson was written. If it says `emu` you are on the interpreter, and the totals in this lesson still hold, but for a different reason. There is a note about that at the end.
+
+## The question
+
+Start four Erlang processes on one CPU core. Each one runs a loop that never blocks, never sends a message and never calls into the operating system. Pure arithmetic in a tight loop.
+
+An operating system takes a thread off a core with a timer interrupt. The BEAM does not do that. There is no timer interrupt for Erlang processes, no signal, and no OS thread per process. Millions of processes on eight cores is a normal day.
+
+So what moves the first process off the core?
+
+## Predict before you run
+
+Write your answers down. Somewhere you will see them again in five minutes, not in your head.
+
+**One.** Four spinning processes, one core, each doing the same fixed amount of work. Do they finish roughly together, or does the first one finish, then the second, then the third?
+
+**Two.** However the VM decides to swap a process out, some counter has to reach some number. What number? Say a figure, not "it depends".
+
+**Three.** One process spends its turn adding small integers. Another spends its turn multiplying enormous ones, where a single multiply takes thousands of times longer. Does the slow one get moved off sooner, later, or at the same point?
+
+Now run things.
+
+## Fairness, observed
+
+Four processes, the same fixed amount of work each, timed from a common start. The cell runs the race twice. Once on every core you have, and once with the VM pinned to a single scheduler, which is the interesting case, because on one core any fairness you see cannot have come from parallelism.
+
+<!-- cell: fairness -->
+
+```elixir
+defmodule Spin do
+  def burn(0), do: :done
+  def burn(n), do: burn(n - 1)
+end
+
+race = fn label, n ->
+  IO.puts("#{label}, #{:erlang.system_info(:schedulers_online)} scheduler(s) online")
+  parent = self()
+  t0 = System.monotonic_time(:millisecond)
+
+  for name <- ~w(a b c d) do
+    spawn(fn ->
+      Spin.burn(n)
+      send(parent, {name, System.monotonic_time(:millisecond) - t0})
+    end)
+  end
+
+  times =
+    for _ <- 1..4 do
+      receive do
+        {name, ms} ->
+          IO.puts("  #{name} finished at #{ms} ms")
+          ms
+      end
+    end
+
+  IO.puts("  spread between first and last: #{Enum.max(times) - Enum.min(times)} ms\n")
+end
+
+n = 40_000_000
+race.("all cores", n)
+
+before = :erlang.system_flag(:schedulers_online, 1)
+race.("one core", n)
+:erlang.system_flag(:schedulers_online, before)
+IO.puts("restored to #{:erlang.system_info(:schedulers_online)} schedulers online")
+```
+
+Here is what that printed on the machine this lesson was written on. Your millisecond figures will be different, and the all cores block will be noisy if anything else is using the machine, because four processes on ten cores are at the mercy of whatever else is running. The one core block is the one to read.
+
+```
+all cores, 10 scheduler(s) online
+  b finished at 59 ms
+  a finished at 60 ms
+  d finished at 61 ms
+  c finished at 63 ms
+  spread between first and last: 4 ms
+
+one core, 1 scheduler(s) online
+  a finished at 295 ms
+  b finished at 295 ms
+  c finished at 295 ms
+  d finished at 295 ms
+  spread between first and last: 0 ms
+
+restored to 10 schedulers online
+```
+
+Read the one core block again. Four processes shared a single core for 295 milliseconds and finished inside the same millisecond as each other. They were interleaved thousands of times.
+
+Nothing in `Spin.burn/1` yields. It has no receive, no sleep, no IO. Something outside the loop is taking the core away and handing it to the next process, over and over, and it is doing so evenly enough that four independent processes land on the same millisecond.
+
+That something is the reduction budget. Here is the shape of what happened on that single core.
+
+![Four lanes labelled a to d. Each lane holds a row of blocks marked 4000, and the blocks are offset so that only one process holds the core at a time. A caption points at the first boundary and reads budget spent, back of the queue.](files/reduction-budget.svg)
+
+Each block is one turn. The process at the front of the queue runs until its budget hits zero, then goes to the back, and the next one starts with a full budget of its own. Nobody is timed and nobody is interrupted. They are counted.
+
+The figure is drawn in Excalidraw and the source is next to it, at `files/reduction-budget.excalidraw`, so you can open it and change it rather than reverse engineering an image.
+
+## Ask the VM for the number
+
+The budget is not a secret and you do not need the source to read it. The VM will tell you.
+
+<!-- cell: ask-the-vm -->
+
+```elixir
+:erlang.system_info(:context_reductions)
+```
+
+```
+4000
+```
+
+Four thousand. Compare that against what you wrote down for question two.
+
+If you wrote 2000, you are in good company and you are reading an answer that expired in 2017. There is a section at the end about where that number came from, because it was correct for a long time and the reason it changed is more interesting than the number.
+
+## What one reduction actually is
+
+The VM told you the size of the budget. It did not tell you the unit. That is the next thing to pin down, and it is measurable too, because every process carries a running count of the reductions it has spent and will hand it over on request.
+
+<!-- cell: measure -->
+
+```elixir
+measure = fn fun ->
+  parent = self()
+
+  pid =
+    spawn(fn ->
+      {:reductions, before} = Process.info(self(), :reductions)
+      fun.()
+      {:reductions, after_} = Process.info(self(), :reductions)
+      send(parent, {self(), after_ - before})
+    end)
+
+  receive do
+    {^pid, delta} -> delta
+  end
+end
+
+IO.puts("an empty function costs #{measure.(fn -> :ok end)} reductions")
+```
+
+```
+an empty function costs 5 reductions
+```
+
+Five is the cost of the harness itself. The two `Process.info` calls and the spawn are not free. Subtract it from everything below and you are measuring the thing you asked about rather than the question.
+
+Now three loops that differ only in the shape of the call.
+
+<!-- cell: per-call -->
+
+```elixir
+defmodule Loop do
+  # the recursive call is the last thing this clause does
+  def tail(0), do: :done
+  def tail(n), do: tail(n - 1)
+
+  # the recursive call has work waiting for it to come back
+  def body(0), do: 0
+  def body(n), do: 1 + body(n - 1)
+
+  # one extra call and one extra return per iteration
+  def leaf(x), do: x
+  def through_leaf(0, acc), do: acc
+  def through_leaf(n, acc), do: through_leaf(n - 1, leaf(acc))
+end
+
+n = 100_000
+baseline = measure.(fn -> :ok end)
+
+for {name, fun} <- [
+      {"tail call", fn -> Loop.tail(n) end},
+      {"body call", fn -> Loop.body(n) end},
+      {"call through a leaf", fn -> Loop.through_leaf(n, 0) end}
+    ] do
+  total = measure.(fun) - baseline
+  IO.puts("#{String.pad_trailing(name, 20)} #{String.pad_leading("#{total}", 7)}  #{Float.round(total / n, 4)} per iteration")
+end
+```
+
+```
+tail call             100001  1.0 per iteration
+body call             200015  2.0002 per iteration
+call through a leaf   300001  3.0 per iteration
+```
+
+One, two, three. Clean enough that the rule falls out of the numbers.
+
+A tail call costs one. A body call costs two. Calling a helper and coming back adds one more of each.
+
+The rule is: **one reduction when a function is entered, one reduction when a function returns.**
+
+Check the three rows against it.
+
+`tail/1` enters itself 100000 times and returns once at the very end, because a tail call replaces the current frame instead of stacking on top of it. That is 100001.
+
+`body/1` enters itself 100000 times and returns 100000 times, because `1 + body(n - 1)` has to come back to do the addition. That is 200000, and the measurement says 200015. The extra fifteen are garbage collection. A hundred thousand stacked frames is a large stack, growing it triggers a collection, and the collector charges the process for the work. Reduction accounting includes runtime work done on your behalf, not only your own calls.
+
+`through_leaf/2` enters itself, enters `leaf/1`, and `leaf/1` returns. Three per iteration.
+
+## The counter, and what happens when it runs out
+
+<!-- cell: none, this is a diagram -->
+
+```mermaid
+flowchart TD
+  A["scheduler picks a process<br/>off the run queue"] --> B["fcalls = 4000"]
+  B --> C["run the compiled code"]
+  C --> D{"function entered<br/>or returned?"}
+  D -->|yes| E["fcalls = fcalls - 1"]
+  E --> F{"fcalls still<br/>above zero?"}
+  F -->|yes| C
+  F -->|no| G["stop here,<br/>save the process state"]
+  G --> H["put the process at the back<br/>of its run queue"]
+  H --> A
+  D -->|"blocked on receive"| I["leave the queue,<br/>wait for a message"]
+```
+
+The counter is one field on the process, and the scheduler fills it in before handing the process to the compiled code.
+
+The word for it in the source is `fcalls`, and it is a signed 32 bit integer on the process struct at `erts/emulator/beam/erl_process.h:1062@OTP-29.0.5`. Signed, not unsigned, because it is allowed to go negative and the sign is used to carry other information. That is a different lesson.
+
+The chain from the constant to the counter is four steps and you can follow every one.
+
+| Step | Where |
+| --- | --- |
+| The constant is defined as 4000 | `erts/emulator/beam/erl_vm.h:53@OTP-29.0.5` |
+| The scheduler picks it up | `erts/emulator/beam/erl_process.c:9637@OTP-29.0.5` |
+| It becomes this turn's budget | `erts/emulator/beam/erl_process.c:10183@OTP-29.0.5` |
+| It is written onto the process | `erts/emulator/beam/erl_process.c:10435@OTP-29.0.5` |
+
+The number the VM gave you in the cell above comes from the same constant, with nothing in between. `erlang:system_info(context_reductions)` is a single line that wraps the constant into a term and returns it, at `erts/emulator/beam/erl_bif_info.c:3362@OTP-29.0.5`. That is why the observable and the source agree exactly. They are the same number, not two numbers that happen to match.
+
+While the process is running, the counter is not in memory at all. The JIT keeps it in a machine register for the whole turn, `w22` on aarch64 and `r14d` on x86-64, at `erts/emulator/beam/jit/arm/beam_asm.hpp:87@OTP-29.0.5` and `erts/emulator/beam/jit/x86/beam_asm.hpp:127@OTP-29.0.5`. It gets written back to the process struct on the way out.
+
+The decrement is emitted in two places, and they are exactly the two events in the rule.
+
+| Event | aarch64 | x86-64 |
+| --- | --- | --- |
+| A function is entered | `erts/emulator/beam/jit/arm/instr_common.cpp:3114@OTP-29.0.5` | `erts/emulator/beam/jit/x86/instr_common.cpp:3233@OTP-29.0.5` |
+| A function returns | `erts/emulator/beam/jit/arm/instr_call.cpp:51@OTP-29.0.5` | `erts/emulator/beam/jit/x86/instr_call.cpp:70@OTP-29.0.5` |
+
+Calls themselves are not charged. The JIT compiles a call to a plain jump and lets the callee pay on the way in. The comment in the instruction table says so in one line, at `erts/emulator/beam/jit/x86/ops.tab:865@OTP-29.0.5`.
+
+```
+# Handles yielding on function ingress (rather than on each call).
+i_test_yield
+```
+
+That is a deliberate trade. Charging on ingress means the check sits in one place per function instead of at every call site, and every path into the function pays it, including the ones that arrive by jump.
+
+## Prove the link
+
+Two facts are on the table and they have not been connected yet. The budget is 4000, and a tail call costs 1. If both are true, a loop of n tail calls should be moved off the scheduler n divided by 4000 times. Exactly. Not roughly.
+
+You can count the swaps. Tracing a process with the `running` flag delivers an event every time it goes on or off a scheduler, and nothing else in this loop can cause one.
+
+<!-- cell: preemptions -->
+
+```elixir
+preemptions = fn reductions ->
+  parent = self()
+
+  worker =
+    spawn(fn ->
+      receive do
+        :go -> :ok
+      end
+
+      Loop.tail(reductions)
+      send(parent, :finished)
+    end)
+
+  :erlang.trace(worker, true, [:running])
+  send(worker, :go)
+
+  count = fn count, acc ->
+    receive do
+      {:trace, ^worker, :out, _} -> count.(count, acc + 1)
+      :finished -> acc
+    after
+      2000 -> acc
+    end
+  end
+
+  count.(count, 0)
+end
+
+IO.puts("  tail calls   times moved off   calls per move")
+
+for r <- [4_000, 8_000, 20_000, 40_000, 100_000] do
+  moves = preemptions.(r)
+  per = if moves > 0, do: "#{div(r, moves)}", else: "never moved"
+  IO.puts("#{String.pad_leading("#{r}", 12)}#{String.pad_leading("#{moves}", 18)}#{String.pad_leading(per, 17)}")
+end
+```
+
+```
+  tail calls   times moved off   calls per move
+        4000                 1             4000
+        8000                 2             4000
+       20000                 5             4000
+       40000                10             4000
+      100000                25             4000
+```
+
+Every 4000 calls, without exception, across a twenty five fold range. The budget and the unit are now tied to each other by measurement rather than by argument.
+
+Question one from your predictions is answered as well. The four spinners finished together because each of them was stopped after 4000 units of work and put at the back of the queue, thousands of times, and none of them was ever able to take more than its turn.
+
+## What a reduction is not
+
+Question three. Same number of iterations, wildly different amounts of real work per iteration.
+
+<!-- cell: not-time -->
+
+```elixir
+defmodule Work do
+  def adds(0, acc), do: acc
+  def adds(n, acc), do: adds(n - 1, acc + 1)
+
+  def squares(0, acc, _m), do: acc
+  def squares(n, acc, m), do: squares(n - 1, rem(acc * acc, m), m)
+end
+
+timed = fn name, fun ->
+  parent = self()
+
+  pid =
+    spawn(fn ->
+      t0 = System.monotonic_time(:microsecond)
+      fun.()
+      us = System.monotonic_time(:microsecond) - t0
+      {:reductions, r} = Process.info(self(), :reductions)
+      send(parent, {self(), r, us})
+    end)
+
+  receive do
+    {^pid, r, us} ->
+      IO.puts("#{String.pad_trailing(name, 28)}#{String.pad_leading("#{r}", 8)} reductions#{String.pad_leading("#{us}", 10)} us")
+      {r, us}
+  end
+end
+
+modulus = Bitwise.bsl(1, 4096) - 17
+seed = Bitwise.bsl(1, 4095) + 12345
+
+{r1, us1} = timed.("20000 small integer adds", fn -> Work.adds(20_000, 0) end)
+{r2, us2} = timed.("20000 4096 bit multiplies", fn -> Work.squares(20_000, seed, modulus) end)
+
+IO.puts("\n#{Float.round(r2 / r1, 2)} times the reductions, #{round(us2 / us1)} times the wall clock time")
+```
+
+```
+20000 small integer adds       20016 reductions        38 us
+20000 4096 bit multiplies      24874 reductions    199413 us
+```
+
+The second loop took roughly five thousand times longer and was charged roughly the same. The multiply loop pays a little extra, because arithmetic on huge numbers goes through a BIF that charges for the size of its arguments, but nothing close to the ratio of the real work.
+
+So a reduction is not a unit of time. It is a count of a specific event, function entries and returns, and the VM uses it as a rough proxy for time because it is cheap to maintain and impossible to game from Erlang without calling something that also charges you.
+
+The gap between the proxy and reality is real, and it has a name. A single BIF or NIF that runs for a long time without charging reductions will hold its scheduler for exactly that long, and no budget will save you. That is why the VM has dirty schedulers and why writing a well behaved NIF is its own subject.
+
+## The compiler gets a vote
+
+The rule is one on entry and one on return. What counts as a return is decided by the compiler, not by how your source looks, and this is the fastest way to get a surprising number.
+
+<!-- cell: compiler-vote -->
+
+```elixir
+defmodule SameResult do
+  def drop(0), do: :done
+
+  def drop(n) do
+    drop(n - 1)
+    :done
+  end
+end
+
+defmodule DifferentResult do
+  def drop(0), do: :zero
+
+  def drop(n) do
+    drop(n - 1)
+    :done
+  end
+end
+
+n = 100_000
+baseline = measure.(fn -> :ok end)
+
+IO.puts("every clause returns :done      #{measure.(fn -> SameResult.drop(n) end) - baseline}")
+IO.puts("the clauses return different    #{measure.(fn -> DifferentResult.drop(n) end) - baseline}")
+```
+
+```
+every clause returns :done      100001
+the clauses return different    200015
+```
+
+The two modules have the same shape. The recursive call is followed by another expression in both, so neither is a tail call as written. One of them costs half as much as the other.
+
+The difference is that in `SameResult` every clause returns `:done`, so the compiler knows the value of `drop(n - 1)` without running it, and it can throw away the frame and jump. In `DifferentResult` the base case returns `:zero`, so the result has to come back and be discarded, and the frame has to stay.
+
+You can see it in the generated instructions. The same two functions in Erlang, through `erlc -S`, with the noise cut out.
+
+```erlang
+%% every clause returns done
+{gc_bif,'-',{f,0},1,[{x,0},{integer,1}],{x,0}}.
+{call_only,1,{f,2}}.                 %% a tail call, no frame, one reduction
+
+%% the clauses return different atoms
+{gc_bif,'-',{f,0},1,[{x,0},{integer,1}],{x,0}}.
+{allocate,0,1}.
+{call,1,{f,2}}.                      %% a body call
+{move,{atom,done},{x,0}}.
+{deallocate,0}.
+return.                              %% and the return, so two reductions
+```
+
+`call_only` against `call` plus `return`. One reduction against two.
+
+The lesson to take from this is not the optimisation. It is that the reduction counter measures the program that was compiled, and the program that was compiled is not always the program you wrote. When a count surprises you, look at the instructions before you doubt the rule.
+
+## Where 2000 came from
+
+The number 2000 is in a lot of blog posts, conference talks and answers. It was right. It stopped being right on the twenty eighth of December 2016, and it shipped as wrong in OTP 20.0.
+
+One commit did it, `6bcdd45abd97134fddfb5b0307b1d256337b0c67`, and its subject line is the whole story: "Reduction counting on non-tail return".
+
+Before that commit, returning from a function was free. A reduction was charged on the way into a function and nowhere else, so the body recursive loop in this lesson would have cost one per iteration rather than two. The commit added the charge on return, and in the same diff changed the constant from 2000 to 4000.
+
+That pairing is the point. Charging on return roughly doubles the count for ordinary code, so leaving the budget at 2000 would have halved how long every process got to run and changed the latency behaviour of every system in the field. Doubling the budget alongside the new charge kept a typical turn about the same length as before.
+
+So 4000 is not more generous than 2000. It is the same amount of work measured in smaller units. Everyone who learned 2000 learned a true thing about a VM that counted differently.
+
+This lesson states that history and does not prove it. Proving it means reading the commit and running the same measurement against OTP 19.3 and OTP 20.0, which is what `o04` is for, because commit archaeology is a skill with its own method and it deserves its own lesson rather than a paragraph here.
+
+## If your flavor said emu
+
+Everything above holds on the interpreter, and the mechanism underneath is different.
+
+The interpreter has no machine register for the counter and no per function ingress check. It charges on dispatch, when one instruction hands over to the next at a call, and on return. Both are in the same file, `erts/emulator/beam/emu/macros.tab:154@OTP-29.0.5` for the call side and `erts/emulator/beam/emu/macros.tab:222@OTP-29.0.5` for the return side.
+
+Two implementations, two different places to put the charge, and the same totals. A tail call still costs one and a body call still costs two, so every number in this lesson comes out the same. That agreement is not an accident, it is a compatibility requirement, because reduction counts are visible from Erlang and a program that behaved differently under the two flavors would be a bug.
+
+## Boss fight
+
+Predict, then check. Predicting after you look does not count and you will know.
+
+Here is a module you have not measured. Work out, from the rule alone, how many reductions each call costs per element of the list.
+
+```elixir
+defmodule Boss do
+  def total(list), do: total(list, 0)
+  defp total([], acc), do: acc
+  defp total([h | t], acc), do: total(t, acc + h)
+
+  def size([]), do: 0
+  def size([_ | t]), do: 1 + size(t)
+end
+```
+
+Write down two numbers, `total/1` and `size/1`, per element.
+
+Then load `boss.exs`, which sits next to this notebook, and check yourself. Save the notebook to disk first if you have not, because `__DIR__` is how the cell finds the file and Livebook only knows the directory once the notebook has one.
+
+The cell ships with two zeroes in it, which are both wrong on purpose. Put your numbers in before you run it.
+
+<!-- cell: boss -->
+
+```elixir
+Code.require_file("boss.exs", __DIR__)
+
+Boss.Grader.check(total: 0, size: 0)
+```
+
+The grader does not have the answers written into it. It measures both functions on your machine and compares. A grader with the numbers hardcoded would go stale the first time the accounting changed, which is the exact failure this lesson is about.
+
+## What this lesson did not explain
+
+It did not explain what happens to a process after it is moved off. It goes to the back of a run queue, but there are several run queues at several priorities per scheduler, and a process that has been waiting can be promoted. That is `m14`.
+
+It did not explain how a process gets to run again after blocking in a receive, which is a different path entirely and does not involve the budget at all.
+
+It did not explain how a long running BIF avoids holding the scheduler. The mechanism is called trapping, and a BIF that traps hands back a continuation and charges for the work it did.
+
+It did not explain why `fcalls` is signed, or what a negative value means. The short version is that the sign is used to mean something other than "out of budget", and reading the sign correctly is how the VM tells a real preemption apart from a request to stop for another reason.
+
+The normative writeup of the budget, with the exact conditions and the parts this lesson skipped, is `BP-SCHED-001`.
+
+## Claims this lesson makes
+
+Every claim below is in the ledger with the cell that backs it, so you can find out how each one was checked rather than taking it on trust.
+
+| Claim | How it is backed |
+| --- | --- |
+| The budget is 4000 reductions, not 2000 | `CLM-SCHED-0001` |
+| The VM reports the budget directly from the constant | `CLM-SCHED-0002` |
+| One reduction on entry, one on return | `CLM-SCHED-0003` |
+| A loop of n tail calls is moved off n divided by 4000 times | `CLM-SCHED-0004` |
+| A reduction is not a unit of time | `CLM-SCHED-0005` |
+| The budget was 2000 before OTP 20.0 and the change came with return counting | `CLM-SCHED-0006` |
+| The compiler decides what counts as a return | `CLM-SCHED-0007` |

@@ -1,0 +1,55 @@
+id = "t07"
+title = "The reduction budget"
+part = "01-tourist"
+pass = "tourist"
+
+# Tier 0 means a stock release install and nothing else. No emulator build, no
+# root, no repository checkout. That claim is the reason this lesson was chosen
+# as one of the three pilots, so it is written down here rather than implied.
+env = "T0"
+requires = ["otp-29", "livebook"]
+
+duration_minutes = 25
+deps = []
+blueprint = "BP-SCHED-001"
+boss = "boss.exs"
+
+claims = [
+  "CLM-SCHED-0001",
+  "CLM-SCHED-0002",
+  "CLM-SCHED-0003",
+  "CLM-SCHED-0004",
+  "CLM-SCHED-0005",
+  "CLM-SCHED-0006",
+  "CLM-SCHED-0007",
+]
+
+# The prediction gate. A reader who has not answered these has not done the
+# lesson, and the grader for the last one is the lesson itself.
+predictions = [
+  "Four spinners on one core: together, or one after another?",
+  "How many of something does a process get before it is swapped out?",
+  "Does slow work get swapped out sooner than fast work?",
+]
+
+[bake]
+# Cells whose output is identical on every machine, so CI can compare them.
+deterministic = [
+  "ask-the-vm",
+  "measure",
+  "per-call",
+  "preemptions",
+  "compiler-vote",
+  "boss",
+]
+
+# Cells that print wall clock times or machine details. They are run to check
+# they do not crash, and their output is not compared.
+timing_only = ["banner", "fairness", "not-time"]
+
+[verified]
+# Both architectures, both on the JIT, both on the pinned release.
+"aarch64-darwin" = "OTP 29 erts-17.0.5"
+"x86_64-linux" = "OTP 29 erts-17.0.5"
+on = 2026-09-02
+by = "tamnd"

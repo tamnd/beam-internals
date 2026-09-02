@@ -1,0 +1,6 @@
+  tail calls   times moved off   calls per move
+        4000                 1             4000
+        8000                 2             4000
+       20000                 5             4000
+       40000                10             4000
+      100000                25             4000
