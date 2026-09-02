@@ -188,7 +188,28 @@ Generated from the `[yield]` markers in section 3. A reimplementation that misse
 
 **Zero at a return.** The counter reaching exactly zero on a return does not yield. The process completes the return and stops at the next function entry, per the two conditions in sections 3.1 and 3.2.
 
-**A slice that is not 4000.** Starting the emulator with `+T Level`, where `Level` is 0 to 9, replaces the slice with a value from a table: the same, three quarters, a half, seven eighths, a third, ten elevenths, a quarter, five sevenths, a fifth, six sevenths. The smallest is a fifth, at level 8, which is 800. `erlang:system_info(context_reductions)` still returns 4000, because it returns the constant and not the value in use. This is the one case where the observable in INV-SCHED-003 is misleading, and it is detectable only by counting preemptions: 100000 tail calls produce 25 schedule outs by default and 125 under `+T 8`, on both x86-64 and aarch64.
+**A slice that is not 4000.** Starting the emulator with `+T Level`, where `Level` is 0 to 9, replaces the slice with a value from a table.
+
+<!-- bpc: modified-timings -->
+`+T Level` replaces the slice with the value on its row. The default, with no `+T` at all, is `CONTEXT_REDS`, which is 4000. The last column is a separate effect of the same option: `spawn`, `link`, `monitor` and their neighbours trap through `erlang:delay_trap/2` on the way out.
+
+| Level | Slice | Share of a full slice | Delay after spawn and friends |
+| --- | --- | --- | --- |
+| 0 | 4000 | 1 | yields instead of sleeping |
+| 1 | 3000 | 0.75 | yields instead of sleeping |
+| 2 | 2000 | 0.5 | yields instead of sleeping |
+| 3 | 3500 | 0.875 | yields instead of sleeping |
+| 4 | 1333 | 0.333 | yields instead of sleeping |
+| 5 | 3636 | 0.909 | yields instead of sleeping |
+| 6 | 1000 | 0.25 | 1 ms |
+| 7 | 2857 | 0.714 | 1 ms |
+| 8 | 800 | 0.2 | 10 ms |
+| 9 | 3428 | 0.857 | 10 ms |
+<!-- bpc: end modified-timings -->
+
+The levels are not in order of severity. Level 8 is the shortest slice at a fifth, level 9 is the second longest, and the sequence exists to give a test a set of unusual timings rather than a dial from mild to harsh.
+
+`erlang:system_info(context_reductions)` still returns 4000 at every level, because it returns the constant and not the value in use. This is the one case where the observable in INV-SCHED-003 is misleading, and it is detectable only by counting preemptions. A process making 100000 tail calls yields once per slice, so the count is 100000 divided by the row, and all ten rows have been measured: 25, 33, 50, 28, 75, 27, 100, 35, 125 and 29, on both x86-64 and aarch64.
 
 **`erlang:bump_reductions/1`.** Raises `error:badarg` for a negative integer, for a non integer, and for an integer too large to be a small, with the argument list and an `error_info` map naming `erl_erts_errors` in the stack trace entry. For a valid argument it is clamped twice: first to `CONTEXT_REDS` by the built in function itself, then to whatever is left of the slice by the charging macro in section 3.4. Asking for 999999 at the start of a slice charges 4000 by default and 800 under `+T 8`.
 
@@ -289,6 +310,7 @@ Source references, all resolved against the pinned tree.
 | `erts_debug:set_internal_state(reds_left, N)` | `erts/emulator/beam/erl_bif_info.c:5062-5072@OTP-29.0.5` |
 | The modified timing table | `erts/emulator/beam/erl_init.c:157-168@OTP-29.0.5` |
 | Modified timing replacing the slice | `erts/emulator/beam/erl_process.c:9633-9638@OTP-29.0.5` |
+| The delay half of modified timing | `erts/preloaded/src/erlang.erl:12566-12568@OTP-29.0.5` |
 | Reduction counting off on a dirty scheduler | `erts/emulator/beam/beam_common.c:196-204@OTP-29.0.5` |
 | `erlang:yield/0` becoming an instruction | `erts/preloaded/src/erlang.erl:11519-11522@OTP-29.0.5` |
 
@@ -296,4 +318,6 @@ Evidence classes for the claims this blueprint carries are in `blueprints/ledger
 
 Nothing upstream is quoted here. The Erlang/OTP source is Apache-2.0 and is cited rather than reproduced, except for the two short pseudocode restatements in sections 3.1 and 3.2, which are the dialect in `NOTATION.md` rather than the original code.
 
-Checked against the pinned tree on 2026-09-02 by tamnd. The runtime figures in sections 5 and 6 were produced on two machines on the same day, both on OTP 29 erts-17.0.5 with the just in time compiler: aarch64 macOS 24.6.0 and x86-64 Linux in the `erlang:29.0.5` container image. The preemption counts, the two clamped `bump_reductions/1` figures, the frozen `process_info` readings during dirty execution and the `undefined` for a dead process were identical on both.
+The `+T` table in section 5 is generated from `erl_init.c` by `tools/bpc` rather than copied, so it cannot drift from the array it comes from without failing the build. The sentence about `erlang:delay_trap/2` in that region is generated with it.
+
+Checked against the pinned tree on 2026-09-02 by tamnd. The runtime figures in sections 5 and 6 were produced on two machines on the same day, both on OTP 29 erts-17.0.5 with the just in time compiler: aarch64 macOS 24.6.0 and x86-64 Linux in the `erlang:29.0.5` container image. The preemption count was measured at all ten `+T` levels and at the default, and every one of the eleven matched the slice on its row. The two clamped `bump_reductions/1` figures, the frozen `process_info` readings during dirty execution and the `undefined` for a dead process were identical on both machines.
