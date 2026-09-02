@@ -1,0 +1,13 @@
+list                              wire  tag
+[1, 2, 3]                            7  107
+[1, 2, 300]                         16  108
+[1, 2, :three]                      18  108
+65534 bytes                      65538  107
+65535 bytes                      65539  107
+65536 bytes                     131079  108
+
+one element added, 65540 bytes added
+bytes per element before: 1.0
+bytes per element after:  2.0
+
+what comes back: ~c"hi"

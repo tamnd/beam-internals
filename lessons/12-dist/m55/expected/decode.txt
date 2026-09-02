@@ -1,0 +1,14 @@
+off  bytes                                   meaning
+  0  131                                     version number, first byte of every encoded term
+  1  104 4                                   SMALL_TUPLE_EXT, arity 4, four terms follow
+  3  119 4 117 115 101 114                   SMALL_ATOM_UTF8_EXT, 4 bytes, the atom :user
+  9  109 0 0 0 5 97 108 105 99 101           BINARY_EXT, 4 byte length, 5 bytes of data
+ 19  107 0 3 1 2 3                           STRING_EXT, 2 byte length, the list [1, 2, 3]
+ 25  116 0 0 0 1                             MAP_EXT, 4 byte arity, one key and one value follow
+ 30  119 5 97 100 109 105 110                SMALL_ATOM_UTF8_EXT, the key :admin
+ 37  119 4 116 114 117 101                   SMALL_ATOM_UTF8_EXT, the value true
+
+bytes accounted for: 43
+the VM produced:     43
+the reading is the encoding: true
+and it decodes back to the term: true

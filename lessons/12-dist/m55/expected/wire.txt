@@ -1,0 +1,22 @@
+term                  wire  heap  heap  tag  name
+                     bytes words bytes
+0                        3     0     0   97  SMALL_INTEGER_EXT
+255                      3     0     0   97  SMALL_INTEGER_EXT
+256                      6     0     0   98  INTEGER_EXT
+-1                       6     0     0   98  INTEGER_EXT
+2147483648               8     0     0  110  SMALL_BIG_EXT
+576460752303423487      12     0     0  110  SMALL_BIG_EXT
+1.0                     10     2    16   70  NEW_FLOAT_EXT
+:ok                      5     0     0  119  SMALL_ATOM_UTF8_EXT
+[]                       2     0     0  106  NIL_EXT
+[1, 2, 3]                7     6    48  107  STRING_EXT
+{1, 2, 3}                9     4    32  104  SMALL_TUPLE_EXT
+[:a, :b, :c]            16     6    48  108  LIST_EXT
+"alice"                 11     3    24  109  BINARY_EXT
+<<1::size(3)>>           8     3    24   77  BIT_BINARY_EXT
+%{admin: true}          19     6    48  116  MAP_EXT
+[:a | :b]               12     2    16  108  LIST_EXT
+{}                       3     0     0  104  SMALL_TUPLE_EXT
+%{}                      6     3    24  116  MAP_EXT
+the record below        43    20   160  104  SMALL_TUPLE_EXT
+65 zero bytes           71     8    64  109  BINARY_EXT

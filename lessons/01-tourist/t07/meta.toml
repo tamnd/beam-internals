@@ -45,7 +45,7 @@ deterministic = [
 
 # Cells that print wall clock times or machine details. They are run to check
 # they do not crash, and their output is not compared.
-timing_only = ["banner", "fairness", "not-time"]
+not_compared = ["banner", "fairness", "not-time"]
 
 [verified]
 # Both architectures, both on the JIT, both on the pinned release.

@@ -1,0 +1,9 @@
+atom                        chars  bytes  wire  tag
+one letter                     1      1     4  119
+254 letters                  254    254   257  119
+255 letters                  255    255   258  119
+127 two byte characters      127    254   257  119
+128 two byte characters      128    256   260  118
+255 two byte characters      255    510   514  118
+
+256 two byte characters: a system limit has been reached

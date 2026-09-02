@@ -249,3 +249,135 @@ evidence = "unobservable"
 by = ["erts/emulator/beam/erl_term.h:540-543@OTP-29.0.5"]
 verified = 2026-09-02
 by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0001"
+text = "Every term on the external format begins with the version byte 131 followed by one tag byte, and that tag byte alone decides how the rest of the bytes are read."
+where = ["m55", "BP-DIST-001#1"]
+evidence = "observed"
+by = [
+  "cell:m55/wire",
+  "cell:m55/decode",
+  "erts/doc/guides/erl_ext_dist.md:42-46@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0002"
+text = "A three element list of small integers is cheaper on the wire and dearer on the heap than the same three elements in a tuple, 7 bytes against 9 on the wire and 48 bytes against 32 on the heap, so the cheaper shape swaps places depending on which cost you are counting."
+where = ["m55", "BP-DIST-001#2"]
+evidence = "observed"
+by = [
+  "cell:m55/wire",
+  "erts/doc/guides/erl_ext_dist.md:503-513@OTP-29.0.5",
+  "erts/doc/guides/erl_ext_dist.md:463-471@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0003"
+text = "The wire stops calling an integer small at 2 to the 31 and the heap stops calling it small at 2 to the 59, so on a 64 bit build there is a wide band of integers that are free on the heap and arrive as bignums on the wire."
+where = ["m55", "BP-DIST-001#2"]
+evidence = "observed"
+by = [
+  "cell:m55/integers",
+  "erts/doc/guides/erl_ext_dist.md:359-365@OTP-29.0.5",
+  "erts/doc/guides/erl_ext_dist.md:535-550@OTP-29.0.5",
+  "erts/emulator/beam/erl_term.h:263@OTP-29.0.5",
+  "erts/emulator/beam/erl_term.h:269@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0004"
+text = "The short atom tag 119 is chosen when the name fits in 255 bytes while the limit on the name itself is 255 characters, so 255 ascii letters take the short tag and 128 two byte characters take the long one."
+where = ["m55", "BP-DIST-001#3"]
+evidence = "observed"
+by = [
+  "cell:m55/atoms",
+  "erts/doc/guides/erl_ext_dist.md:88-89@OTP-29.0.5",
+  "erts/doc/guides/erl_ext_dist.md:710-724@OTP-29.0.5",
+  "erts/emulator/beam/atom.h:29@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0005"
+text = "A list of bytes is encoded with the compact string tag up to 65535 elements and with the general list tag above that, so adding one element to a 65535 element list adds 65540 bytes and takes the cost from one byte per element to two."
+where = ["m55", "BP-DIST-001#3"]
+evidence = "observed"
+by = [
+  "cell:m55/strings",
+  "erts/doc/guides/erl_ext_dist.md:503-513@OTP-29.0.5",
+  "erts/doc/guides/erl_ext_dist.md:515-524@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0006"
+text = "The order map pairs are written in is not term order and is not stable across runtime instances, because it follows the order this VM happened to create the key atoms in, and the deterministic option replaces it with term order."
+where = ["m55", "BP-DIST-001#4"]
+evidence = "observed"
+by = [
+  "cell:m55/maps",
+  "erts/preloaded/src/erlang.erl:10057-10061@OTP-29.0.5",
+  "erts/emulator/beam/external.c:3418@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0007"
+text = "Compression that would not make the term smaller is dropped without saying so, because zlib is handed an output buffer five bytes shorter than the plain form and the plain bytes are copied over on any error, so a compressed encoding of a five byte term is still five plain bytes."
+where = ["m55", "BP-DIST-001#5"]
+evidence = "observed"
+by = [
+  "cell:m55/options",
+  "erts/emulator/beam/external.c:2269-2280@OTP-29.0.5",
+  "erts/doc/guides/erl_ext_dist.md:57-69@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0008"
+text = "The local option wraps an ordinary encoding in tag 121 and four bytes of instance hash, and inside that wrapper an identifier belonging to this instance carries NIL_EXT where its node name would otherwise go, which is why the encoding survives a node name change and why it is not always the smaller form."
+where = ["m55", "BP-DIST-001#5"]
+evidence = "observed"
+by = [
+  "cell:m55/options",
+  "erts/doc/guides/erl_ext_dist.md:754-777@OTP-29.0.5",
+  "erts/preloaded/src/erlang.erl:10065-10071@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0009"
+text = "Decoding bytes you did not write creates any atom named in them, permanently, unless the safe option is passed, and once the atom exists the same bytes are accepted under safe as well."
+where = ["m55", "BP-DIST-001#6"]
+evidence = "observed"
+by = [
+  "cell:m55/untrusted",
+  "erts/preloaded/src/erlang.erl:1329-1341@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0010"
+text = "Bytes assembled by hand decode into a working pid for a node this runtime has never spoken to, and two such pids differing only in the creation field are not equal even though they report the same node."
+where = ["m55", "BP-DIST-001#6"]
+evidence = "observed"
+by = [
+  "cell:m55/handmade",
+  "erts/doc/guides/erl_ext_dist.md:431-450@OTP-29.0.5",
+  "erts/doc/guides/erl_ext_dist.md:585-600@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"

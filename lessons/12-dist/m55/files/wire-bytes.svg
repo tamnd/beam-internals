@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1620" height="380" viewBox="0 0 1620 380" font-family="Helvetica, Arial, sans-serif">
+<rect width="1620" height="380" fill="#ffffff"/>
+<text x="60" y="56" font-size="20" fill="#1e1e1e">Forty three bytes, and what every one of them is doing</text>
+<text x="60" y="82" font-size="14" fill="#868e96">term_to_binary({:user, "alice", [1, 2, 3], %{admin: true}}) laid out one byte per box</text>
+<text x="60" y="130" font-size="12" fill="#868e96" text-anchor="start">byte 0</text>
+<text x="1522" y="130" font-size="12" fill="#868e96" text-anchor="end">byte 42</text>
+<rect x="60" y="150" width="34" height="58" fill="#f1f3f5" stroke="#868e96" stroke-width="1.2"/>
+<text x="77.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">131</text>
+<rect x="76.5" y="208" width="1" height="20" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="87.44" y="242" font-size="14" fill="#1e1e1e" text-anchor="middle">version</text>
+<rect x="94" y="150" width="34" height="58" fill="#a5d8ff" stroke="#1971c2" stroke-width="1.2"/>
+<text x="111.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">104</text>
+<rect x="128" y="150" width="34" height="58" fill="#a5d8ff" stroke="#1971c2" stroke-width="1.2"/>
+<text x="145.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">4</text>
+<rect x="127.5" y="208" width="1" height="62" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="154.08" y="284" font-size="14" fill="#1e1e1e" text-anchor="middle">SMALL_TUPLE_EXT, arity 4</text>
+<rect x="162" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="179.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">119</text>
+<rect x="196" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="213.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">4</text>
+<rect x="230" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="247.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">117</text>
+<text x="247.0" y="198" font-size="14" fill="#495057" text-anchor="middle">u</text>
+<rect x="264" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="281.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">115</text>
+<text x="281.0" y="198" font-size="14" fill="#495057" text-anchor="middle">s</text>
+<rect x="298" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="315.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">101</text>
+<text x="315.0" y="198" font-size="14" fill="#495057" text-anchor="middle">e</text>
+<rect x="332" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="349.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">114</text>
+<text x="349.0" y="198" font-size="14" fill="#495057" text-anchor="middle">r</text>
+<rect x="263.5" y="208" width="1" height="20" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="264.0" y="242" font-size="14" fill="#1e1e1e" text-anchor="middle">the atom :user</text>
+<rect x="366" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="383.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">109</text>
+<rect x="400" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="417.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="434" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="451.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="468" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="485.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="502" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="519.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">5</text>
+<rect x="536" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="553.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">97</text>
+<text x="553.0" y="198" font-size="14" fill="#495057" text-anchor="middle">a</text>
+<rect x="570" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="587.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">108</text>
+<text x="587.0" y="198" font-size="14" fill="#495057" text-anchor="middle">l</text>
+<rect x="604" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="621.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">105</text>
+<text x="621.0" y="198" font-size="14" fill="#495057" text-anchor="middle">i</text>
+<rect x="638" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="655.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">99</text>
+<text x="655.0" y="198" font-size="14" fill="#495057" text-anchor="middle">c</text>
+<rect x="672" y="150" width="34" height="58" fill="#ffec99" stroke="#f08c00" stroke-width="1.2"/>
+<text x="689.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">101</text>
+<text x="689.0" y="198" font-size="14" fill="#495057" text-anchor="middle">e</text>
+<rect x="535.5" y="208" width="1" height="62" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="536.0" y="284" font-size="14" fill="#1e1e1e" text-anchor="middle">BINARY_EXT, "alice"</text>
+<rect x="706" y="150" width="34" height="58" fill="#d0bfff" stroke="#6741d5" stroke-width="1.2"/>
+<text x="723.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">107</text>
+<rect x="740" y="150" width="34" height="58" fill="#d0bfff" stroke="#6741d5" stroke-width="1.2"/>
+<text x="757.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="774" y="150" width="34" height="58" fill="#d0bfff" stroke="#6741d5" stroke-width="1.2"/>
+<text x="791.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">3</text>
+<rect x="808" y="150" width="34" height="58" fill="#d0bfff" stroke="#6741d5" stroke-width="1.2"/>
+<text x="825.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">1</text>
+<rect x="842" y="150" width="34" height="58" fill="#d0bfff" stroke="#6741d5" stroke-width="1.2"/>
+<text x="859.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">2</text>
+<rect x="876" y="150" width="34" height="58" fill="#d0bfff" stroke="#6741d5" stroke-width="1.2"/>
+<text x="893.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">3</text>
+<rect x="807.5" y="208" width="1" height="20" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="808.0" y="242" font-size="14" fill="#1e1e1e" text-anchor="middle">STRING_EXT, the list [1, 2, 3]</text>
+<rect x="910" y="150" width="34" height="58" fill="#ffc9c9" stroke="#e03131" stroke-width="1.2"/>
+<text x="927.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">116</text>
+<rect x="944" y="150" width="34" height="58" fill="#ffc9c9" stroke="#e03131" stroke-width="1.2"/>
+<text x="961.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="978" y="150" width="34" height="58" fill="#ffc9c9" stroke="#e03131" stroke-width="1.2"/>
+<text x="995.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="1012" y="150" width="34" height="58" fill="#ffc9c9" stroke="#e03131" stroke-width="1.2"/>
+<text x="1029.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">0</text>
+<rect x="1046" y="150" width="34" height="58" fill="#ffc9c9" stroke="#e03131" stroke-width="1.2"/>
+<text x="1063.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">1</text>
+<rect x="994.5" y="208" width="1" height="62" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="995.0" y="284" font-size="14" fill="#1e1e1e" text-anchor="middle">MAP_EXT, one pair</text>
+<rect x="1080" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1097.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">119</text>
+<rect x="1114" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1131.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">5</text>
+<rect x="1148" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1165.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">97</text>
+<text x="1165.0" y="198" font-size="14" fill="#495057" text-anchor="middle">a</text>
+<rect x="1182" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1199.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">100</text>
+<text x="1199.0" y="198" font-size="14" fill="#495057" text-anchor="middle">d</text>
+<rect x="1216" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1233.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">109</text>
+<text x="1233.0" y="198" font-size="14" fill="#495057" text-anchor="middle">m</text>
+<rect x="1250" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1267.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">105</text>
+<text x="1267.0" y="198" font-size="14" fill="#495057" text-anchor="middle">i</text>
+<rect x="1284" y="150" width="34" height="58" fill="#99e9f2" stroke="#0c8599" stroke-width="1.2"/>
+<text x="1301.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">110</text>
+<text x="1301.0" y="198" font-size="14" fill="#495057" text-anchor="middle">n</text>
+<rect x="1198.5" y="208" width="1" height="20" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="1199.0" y="242" font-size="14" fill="#1e1e1e" text-anchor="middle">the key :admin</text>
+<rect x="1318" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="1335.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">119</text>
+<rect x="1352" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="1369.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">4</text>
+<rect x="1386" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="1403.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">116</text>
+<text x="1403.0" y="198" font-size="14" fill="#495057" text-anchor="middle">t</text>
+<rect x="1420" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="1437.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">114</text>
+<text x="1437.0" y="198" font-size="14" fill="#495057" text-anchor="middle">r</text>
+<rect x="1454" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="1471.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">117</text>
+<text x="1471.0" y="198" font-size="14" fill="#495057" text-anchor="middle">u</text>
+<rect x="1488" y="150" width="34" height="58" fill="#b2f2bb" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="1505.0" y="176" font-size="13" fill="#1e1e1e" text-anchor="middle">101</text>
+<text x="1505.0" y="198" font-size="14" fill="#495057" text-anchor="middle">e</text>
+<rect x="1419.5" y="208" width="1" height="62" fill="#adb5bd" stroke="#adb5bd" stroke-width="1"/>
+<text x="1420.0" y="284" font-size="14" fill="#1e1e1e" text-anchor="middle">the value true</text>
+<text x="60" y="344" font-size="13" fill="#868e96" text-anchor="start">The first byte says which version of the format this is. Every byte after it belongs to exactly one term, and no term overlaps another.</text>
+</svg>

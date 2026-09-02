@@ -1,0 +1,7 @@
+in the atom table to start with: false
+binary_to_term with safe:        refused
+binary_to_term without safe:     :"no one has ever typed this atom"
+in the atom table now:           true
+binary_to_term with safe again:  accepted
+
+44 bytes on the wire become 4000 bytes of term

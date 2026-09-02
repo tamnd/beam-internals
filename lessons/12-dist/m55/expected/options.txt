@@ -1,0 +1,19 @@
+compression
+  4000 repeated bytes, plain 4006, compressed 44
+  first six bytes: [131, 80, 0, 0, 15, 165]
+  the size field says 4005, which is the plain form without its version byte
+  round trips: true
+  asking for compression on :ok gives 5 bytes, tag 119
+
+minor version 0, which is what the format looked like before OTP R11B-4
+  1.0 today: [131, 70, 63, 240, 0, 0, 0, 0, 0, 0]
+  1.0 then:  33 bytes, tag 99, text "1.00000000000000000000e+00"
+  :ok then:  [131, 100, 0, 2, 111, 107]
+
+the local option
+  tag: 121
+  then four bytes of hash, and at offset 6 an ordinary reference, tag 90
+  that reference has 106 where its node name goes, which is NIL_EXT
+  so a reference of your own costs 26 bytes with local, whatever your node is called
+  a reference from a@b: 25 bytes plain, 30 with local
+  round trips here: true
