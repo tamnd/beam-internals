@@ -97,3 +97,18 @@ def test_the_blueprint_template_passes_the_blueprint_checker() -> None:
 def test_the_licences_are_both_present() -> None:
     for name in ("LICENSE-CODE.txt", "LICENSE-CONTENT.txt", "NOTICE"):
         assert Path(name).read_text(encoding="utf-8").strip()
+
+
+def test_the_site_config_understands_mermaid() -> None:
+    # Material only loads the mermaid renderer when the custom fence is
+    # configured. Without this the diagrams in the lessons publish as a code
+    # block full of arrows, which is worse than no diagram.
+    base = Path("site/mkdocs.base.yml").read_text(encoding="utf-8")
+    assert "name: mermaid" in base
+    assert "fence_code_format" in base
+
+
+def test_the_generated_nav_matches_the_lessons_on_disk() -> None:
+    generated = Path("site/mkdocs.yml").read_text(encoding="utf-8")
+    for path in sorted(Path("lessons").rglob("lesson.livemd")):
+        assert f"lessons/{path.parent.name}/index.md" in generated

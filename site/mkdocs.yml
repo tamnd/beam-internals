@@ -1,6 +1,7 @@
 # The parts of the site config a person writes. The navigation is generated from
-# what is on disk by tools/sitebuild, and written to mkdocs.yml, which is not
-# committed. That is what stops a lesson from being added and left with no page.
+# what is on disk by tools/sitebuild and written to mkdocs.yml, which is
+# committed, so a lesson added without a page fails review instead of quietly
+# becoming unreachable.
 
 site_name: beam-internals
 site_description: A visual teardown of the BEAM, the runtime behind Erlang and Elixir, pinned to OTP 29.0.5
@@ -40,7 +41,14 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.details
-  - pymdownx.superfences
+  # Mermaid blocks are handed to the browser instead of being highlighted as
+  # code. Livebook already renders them, so a diagram written once shows up as
+  # a diagram in the notebook and on the site rather than as a wall of arrows.
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
 
 plugins:
   - search
