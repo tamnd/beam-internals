@@ -381,3 +381,32 @@ by = [
 ]
 verified = 2026-09-02
 by_whom = "tamnd"
+
+# The two claims below have no lesson behind them, which is the point of
+# recording them. Both were found by CT-DIST-001 on the day it was written, and
+# both contradict what BP-DIST-001 said at the time. A ledger that could only
+# record what a lesson happens to teach would have no place to put either.
+
+[[claim]]
+id = "CLM-DIST-0011"
+text = "There is no framing check on a decode. binary_to_term/1 reads one term and ignores whatever follows it, so an encoding padded with junk returns the term and no error, and the used option is the only way a caller can find out the extra bytes were there."
+where = ["BP-DIST-001#5"]
+evidence = "observed"
+by = [
+  "case:ct_dist_001/trailing-bytes-ignored",
+  "erts/preloaded/src/erlang.erl:1363-1377@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-DIST-0012"
+text = "The 255 character limit on an atom name raises a different exception class depending on which function reports it. Decoding an atom of 256 characters raises badarg and list_to_atom of 256 characters raises system_limit, so a conformance suite that asserts one class for both routes fails against ERTS."
+where = ["BP-DIST-001#5"]
+evidence = "observed"
+by = [
+  "case:ct_dist_001/failure-atom-too-long",
+  "erts/emulator/beam/atom.h:29@OTP-29.0.5",
+]
+verified = 2026-09-02
+by_whom = "tamnd"

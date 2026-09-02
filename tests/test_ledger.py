@@ -69,3 +69,17 @@ def test_the_committed_ledger_is_valid() -> None:
     with Path("blueprints/ledger.toml").open("rb") as handle:
         data = tomllib.load(handle)
     assert ledger.validate(data["claim"]) == []
+
+
+def test_an_observed_claim_can_lean_on_a_conformance_case() -> None:
+    """A case in a suite is somebody running it, the same as a cell in a lesson.
+
+    It is the stronger of the two, because a case runs in CI on every change and
+    a cell runs when a reader opens the notebook.
+    """
+    assert ledger.validate([claim(by=["case:ct_dist_001/trailing-bytes-ignored"])]) == []
+
+
+def test_an_observed_claim_still_needs_one_or_the_other() -> None:
+    problems = ledger.validate([claim(by=["conformance/suites/ct_dist_001.erl"])])
+    assert any("conformance case" in problem for problem in problems)

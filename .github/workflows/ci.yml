@@ -116,6 +116,25 @@ jobs:
       - name: Tests
         run: pytest
 
+  conformance:
+    name: conformance suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The release the blueprints are written against, not whatever is newest.
+      # A suite that passes on a different release has checked a different
+      # runtime, and the runner prints both so a mismatch is visible.
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124  # v1.24.1
+        with:
+          otp-version: "29.0.5"
+
+      - name: Every case in every suite
+        run: ./conformance/run.escript
+
   workflows:
     name: workflow lint
     runs-on: ubuntu-latest

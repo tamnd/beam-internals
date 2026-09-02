@@ -1,6 +1,6 @@
 # BP-DIST-001 The external term format
 
-Status: draft
+Status: reviewed
 Applies to: OTP-29.0.5 (erts-17.0.5)
 Lesson: m55
 Depends on: BP-TERM-001
@@ -265,12 +265,15 @@ A reimplementation is free to make a different choice here, and if it does it ha
  6.     fail badarg                                                [fail]
  7. if the tag names an atom and the `safe` option is set
  8.     look the name up, and fail if no such atom exists          [fail]
- 9. read the fields the tag declares                               [yield]
+ 9. read the fields the tag declares, or fail if they run out      [yield] [fail]
 10. build the term on the process heap                             [alloc]
 11. if the term has children, continue at step 4 for each          [yield]
-12. if bytes remain and the `used` option is not set
-13.     fail badarg                                                [fail]
+12. if the `used` option is set
+13.     return the term and the number of bytes read
+14. return the term, and say nothing about any bytes left over
 ```
+
+Step 14 is not a simplification of the algorithm, it is the algorithm. There is no check that the input held exactly one term, so extra bytes are read by nobody and reported to nobody. Step 9 is where too few bytes are caught, which is why a truncated encoding fails and an over long one does not.
 
 Step 7 is the only security relevant step in this document and it is worth stating why. Without it, step 8 creates any atom the bytes name, atoms are never collected, and a sender who controls the bytes controls how much of a fixed table the receiver gives away. With it, a name that is not already an atom fails the decode.
 
@@ -328,7 +331,9 @@ All four exist for the same reason. Both directions of this format are unbounded
 
 **The removed fun tag.** `FUN_EXT` has been unemitted since OTP R8 and undecodable since OTP 23, and the decoder has an explicit arm for it that fails rather than letting it reach the unknown tag path. The observable result is the same `badarg` either way. The reason to keep the explicit arm is that it documents the removal at the place a reader looks for it.
 
-**Trailing bytes.** `binary_to_term/1` on an encoding followed by anything at all fails with `badarg`. `binary_to_term/2` with `used` returns the term and the number of bytes consumed, and leaves the caller to decide about the rest. A reimplementation that quietly ignores trailing bytes in the one argument form has removed a framing check that callers rely on.
+**Trailing bytes.** There is no framing check, and this is the statement in this document most likely to surprise a reader. `binary_to_term/1` reads one term, stops, and says nothing at all about the bytes it did not read. An encoding of `{a, b, c}` followed by eighteen bytes of anything returns `{a, b, c}` and no error. `binary_to_term/2` with `used` returns the term and the number of bytes consumed, and it is the only way a caller can find out that there was anything left over. A reimplementation that rejects trailing bytes in the one argument form has added a check ERTS does not perform, and a caller that reads a successful decode as proof that the whole input was one term is wrong on both implementations.
+
+**Missing bytes are the other case.** An encoding cut short anywhere fails with `badarg`, because the decoder runs out of input rather than finishing early. Too few bytes is an error and too many is not, which is not symmetric and is worth stating in those words.
 
 **`safe` and atoms.** The option refuses to create an atom and refuses to create an external function reference. It does not validate anything else. A decoded term can still be enormous, can still be deeply nested, and can still be a perfectly valid term that the receiving program has no business acting on. The documented warning says the option makes the data safe for the runtime and not for the application, and a reimplementation should copy that sentence rather than improve on it.
 
@@ -344,7 +349,9 @@ All four exist for the same reason. Both directions of this format are unbounded
 
 **`minor_version` 0.** Floats become a 31 byte zero padded decimal text field and atoms become latin1. A float takes 33 bytes instead of 10 and the text is what `sprintf` with `%.20e` produces. A reimplementation supporting this version has to match that formatting exactly, because the far side reads it back with `sscanf` and any difference in the number of digits is a different number.
 
-**Atom names at the limit.** 255 characters, and the failure is `system_limit` rather than `badarg`. The tag boundary is at 255 bytes and is a different boundary, so an atom can be legal and still cross from the one byte length field to the two byte one. Both boundaries have to be implemented and neither implies the other.
+**Atom names at the limit.** 255 characters, and the class of the failure depends on which door the name came in through. `list_to_atom/1` on 256 characters raises `system_limit`, which is the class BP-TERM-001 states. Decoding an atom of 256 characters raises `badarg`, because the decoder reports a malformed encoding rather than an exhausted resource. Same limit, two classes, and a conformance suite that asserts one of them for both routes fails against ERTS.
+
+The tag boundary is at 255 bytes and is a different boundary again, so an atom can be legal and still cross from the one byte length field to the two byte one. A 255 character name of two byte text is 510 bytes, is a legal atom, and takes the wide tag. Three limits, three different quantities, and none of them implies either of the others.
 
 **Lists at the string boundary.** 65535 elements is the last length `STRING_EXT` can carry. The standard states this as a requirement on implementations rather than as an observation, so an encoder that emits a longer `STRING_EXT` is producing something no conforming decoder can read.
 
@@ -361,7 +368,7 @@ Everything below is reachable from Erlang without a special build and without a 
 | The bytes | `erlang:term_to_binary/1,2` | Exactly what the distribution would send, which is why none of this needs a cluster to study. |
 | The term | `erlang:binary_to_term/1,2` | The inverse, with `safe` and `used` as the two options. |
 | The size without the bytes | `erlang:external_size/1,2` | The byte count 3.1 would produce, computed without building the binary. |
-| Bytes consumed | `binary_to_term/2` with `used` | The framing check in 3.8 step 12, exposed. |
+| Bytes consumed | `binary_to_term/2` with `used` | Step 13 of 3.8. The only way to learn that the input held more than the term. |
 | Whether compression helped | `byte_size/1` of the result | The only way to see the fallback in 3.7 step 4. There is no other signal. |
 | Whether an atom already exists | `binary_to_term/2` with `safe` | Indirectly, and it is the mechanism in 3.8 step 7. |
 
@@ -375,25 +382,43 @@ What is not observable is the choice of tag, directly. Nothing returns "this ter
 
 ## 7. Conformance
 
-`CT-DIST-001` is not written. This section says what it will assert, so that the specification can be argued with before the tests exist.
+`CT-DIST-001`, in `conformance/suites/ct_dist_001.erl`, run by `conformance/run.escript`. 23 cases, every one of them Tier 0, which means one node with no name, no network and a stock release install. That is not a convenience, it is a property of the format worth stating in the conformance section: the bytes `term_to_binary/1` produces are the bytes the distribution sends, so the whole of this document can be checked without ever starting a second node.
 
-**Round trip.** For a corpus covering every term kind with a wire form, assert that decoding an encoding gives back a term that is `=:=` to the original. Include improper lists, empty containers, a bignum past `LARGE_BIG_EXT`, a bitstring that is not a whole number of bytes, and a map with keys of three different types. This is INV-DIST-2 and it is the assertion a reimplementation will pass first.
+| Case | Tier | What it asserts |
+| --- | --- | --- |
+| `round-trip` | 0 | INV-DIST-2 over a corpus of 34 terms covering every kind with a wire form, including an improper list, the empty containers, a bignum past the four byte length field, a bitstring that is not a whole number of bytes, and a map with keys of three types. |
+| `round-trip-deterministic` | 0 | The same corpus under `deterministic`, and that encoding the same term twice gives the same bytes. |
+| `external-size-agrees` | 0 | `external_size/1` and `byte_size(term_to_binary(T))` agree over the corpus, with and without options. A size estimator that disagrees with its own encoder fails only under memory pressure. |
+| `tag-small-integer` | 0 | 255 takes the one byte tag and 256 does not, and -1 does not either, because that field is unsigned however small the value looks. |
+| `tag-integer` | 0 | The signed 32 bit boundary in both directions, the 255 byte digit count boundary between the two bignum tags, and that a bignum and its negation are the same length, since the form is sign and magnitude. |
+| `tag-atom` | 0 | 255 ASCII characters take the short tag, 128 two byte characters are 256 bytes and take the long one, and the longest legal atom is 255 characters and 510 bytes. |
+| `tag-tuple` | 0 | 255 elements against 256, and the empty tuple. |
+| `tag-string` | 0 | 65535 elements against 65536, and that the one extra element costs 65540 bytes. |
+| `string-three-conditions` | 0 | Each of the three conditions in 3.4 step 3 broken on its own: an improper list, an element above 255, a negative element, a non integer element. A suite that varies only the length passes for the wrong reason. |
+| `size-integer-band` | 0 | Section 2.5, the integer table. Fails rather than skips on a word size it has no numbers for. |
+| `size-list-tuple-swap` | 0 | Section 2.5, the shape table, including the direction of both inequalities. |
+| `deterministic-map-order` | 0 | With the option the pairs are in the standard order and three different insertion orders give one set of bytes. Without it the order is asserted only to differ from term order, never to be any particular thing. |
+| `compression-declines` | 0 | A two byte binary asked to compress comes back as the plain encoding, byte for byte, with the tag it would have had anyway. |
+| `compression-works` | 0 | Four thousand repeated bytes get the compressed tag, get smaller, round trip, and declare the right uncompressed size. |
+| `safe-atom-order` | 0 | `safe` refuses, then plain accepts, then `safe` accepts the same bytes. The name is generated at run time so that nothing in the setup can have created the atom first. |
+| `trailing-bytes-ignored` | 0 | There is no framing check. A term followed by junk decodes, `used` is the only way to learn the bytes were there, and a truncated encoding fails where an over long one does not. |
+| `identifier-creation` | 0 | Two pids differing only in creation are unequal and report the same node. |
+| `identifier-unknown-node` | 0 | An identifier for a node this runtime has never spoken to decodes, compares, works as a map key and round trips. |
+| `bitstring-tags` | 0 | Which of the two tags a bitstring gets, that the bits field holds 1 through 8 rather than 0 through 7, and that the bits are counted from the top of the last byte. |
+| `failure-classes` | 0 | Five failures on their exact class and reason, including the removed fun tag and `local` with `deterministic`. |
+| `failure-atom-too-long` | 0 | The same limit through two doors, `badarg` on the decode and `system_limit` from `list_to_atom/1`. |
+| `yield-encoding` | 0 | Encoding a 500000 element list charges more than one full scheduler slice, so the process was put down and picked up again. |
+| `yield-decoding` | 0 | The same for decoding. |
 
-**Tag choice.** For each boundary in section 3, encode the value on each side of it and assert the tag byte. 255 and 256 for `SMALL_INTEGER_EXT`. 2^31 - 1 and 2^31 for `INTEGER_EXT`. 255 and 256 bytes of atom name. 255 and 256 elements of tuple. 65535 and 65536 elements of byte list. Reading the tag out of the bytes and not inferring it from a size, because a size test passes for the wrong reason when two tags happen to produce the same length.
+What the suite does not cover is as much a decision as what it does, and it is recorded in `conformance/SCORECARD.md` rather than left for somebody to notice.
 
-**The three conditions on `STRING_EXT`.** A short list of bytes, a short improper list of bytes, and a short list containing one integer above 255. Assert the first takes `STRING_EXT` and the other two take `LIST_EXT`. Each condition in 3.4 step 3 gets its own case, because a reimplementation that checks only the element range passes a test that varies only the length.
+The four yield points in section 4 have two cases between them, both of which show that a reschedule happened and neither of which shows where. The reduction counter is the only instrument Tier 0 has, and it cannot tell an encode that trapped four times from one that trapped forty. Distinguishing them needs a trace, which is Tier 1, and the map sort and the compression chunk have no case at all.
 
-**Both size boundaries.** Assert that `2^59 - 1` costs zero heap words and twelve wire bytes on a 64 bit build, and that `[1, 2, 3]` and `{1, 2, 3}` order the opposite way on the two measures. This is section 2.5 and it is the assertion that catches a reimplementation deriving one size from the other.
+The `minor_version` 0 float format is not exercised. It is a 31 byte zero padded decimal field read back with `sscanf`, and matching it needs a range of values compared against recorded output, which belongs with the corpora rather than here.
 
-**`deterministic`.** Build the same map by several different insertion orders and assert the encodings are byte identical under the option. Assert separately that they are not required to be identical without it, which is a test that must not assert inequality, since equal bytes are a legal outcome. What it asserts is that the suite does not depend on the answer.
+The fun failure in section 5 is not exercised, because reproducing it needs a second node without the module loaded, which is Tier 2.
 
-**Compression declines.** Encode a five byte term with `compressed` and assert the result is the plain form with no `80` tag. Encode four thousand repeated bytes and assert the result is smaller and round trips. This is 3.7 and both halves are needed, because an implementation that never compresses passes the first alone.
-
-**`safe`, in the order that matters.** Build the bytes for an atom by hand so the setup does not create it. Assert `safe` refuses. Assert plain accepts. Assert `safe` then accepts the same bytes. The three steps in that order are the test, and any one of them alone asserts something weaker than the claim.
-
-**Failure classes.** A tag byte no version defines raises `badarg`. Trailing bytes raise `badarg` without `used`. An atom name above 255 characters raises `system_limit`. `local` with `deterministic` is refused. Each asserted on the exact class, using multibyte text for the atom case so that a reimplementation counting bytes fails it.
-
-**Yield points.** Encode and decode a term large enough to exceed the budgets in section 4 and assert the calling process was rescheduled, by watching reductions across the call. This is the assertion a reimplementation is most likely to skip and the one whose absence changes the system's scheduling behaviour rather than its results.
+The 32 bit column of section 2.5 has never been run. `size-integer-band` fails rather than skips on any word size other than 8, so the day somebody runs this on a 32 bit build they get a failure that says the numbers were never written down, which is the truth.
 
 ## 8. Porting notes
 
@@ -448,11 +473,15 @@ What is not observable is the choice of tag, directly. Nothing returns "this ter
 | `deterministic`, and that it excludes `local` | erts/preloaded/src/erlang.erl:10057-10064@OTP-29.0.5 |
 | `local`, and what it survives | erts/preloaded/src/erlang.erl:10065-10078@OTP-29.0.5 |
 | `safe`, and what it does not cover | erts/preloaded/src/erlang.erl:1328-1346@OTP-29.0.5 |
-| `used`, and the framing check | erts/preloaded/src/erlang.erl:1363-1377@OTP-29.0.5 |
+| `used`, and its example with bytes left over | erts/preloaded/src/erlang.erl:1363-1377@OTP-29.0.5 |
 | The atom name limit as a constant | erts/emulator/beam/atom.h:29-31@OTP-29.0.5 |
 
 The two tables in section 2 are generated by `tools/bpc.py`. The first is read from the standard and cross checked against the emulator's defines, and a value that differs between them fails the build. The second is the set difference between the two sources, so a tag added upstream stops the build until somebody writes the sentence that explains it. Neither table is editable by hand.
 
-This document is `draft`. What stands between it and `reviewed` is `CT-DIST-001`, and the list of statements that no test yet covers is worth writing down. The four yield points in section 4 are read from the source and their effect on reductions has not been measured. The claim in section 2.4 that a current encoder emits 25 tags and a decoder accepts 31 was counted by reading the emulator rather than by exercising it. The fun failure in section 5 is described from the format and has not been reproduced against a node missing a module. The `minor_version` 0 float formatting was checked for one value and not across a range. Everything else in sections 2, 3 and 5 is backed by a measurement in `m55`.
+This document is `reviewed`, and it is the first one here to leave `draft`, so the rule it was promoted under is written down rather than left to be inferred. A blueprint is `reviewed` when a conformance suite names it, the suite runs green on more than one architecture, and section 7 lists both what the suite covers and what it does not. `stable` is a stronger claim about the document holding across releases and nothing has earned it yet.
+
+Two statements in this document were wrong when it was first written, and `CT-DIST-001` found both within an hour of existing. It said that `binary_to_term/1` rejects trailing bytes, which it does not, and it said that decoding an over long atom raises `system_limit`, which it does not either. Both were plausible, both were written from reading the source rather than running it, and neither would have been caught by any other check in this repository. They are recorded here rather than quietly corrected because the reason to build a conformance suite is that a specification nobody has run is a specification nobody has checked.
+
+The claim in section 2.4 that a current encoder emits 25 tags and a decoder accepts 31 is still counted by reading the emulator rather than by exercising it, and is the one statement of substance here with no case behind it.
 
 Verified on 2026-09-02 by tamnd against OTP-29.0.5, erts-17.0.5. Byte counts measured on aarch64 macOS and on x86-64 Linux and identical on both. The 32 bit column of section 2.5 is read from the source and has not been measured, because no 32 bit build was available.
