@@ -160,6 +160,51 @@ def test_the_bottom_rung_links_at_a_page_the_site_stages(real: node.Ladder) -> N
     assert real.corpus_page in staged
 
 
+def test_every_threat_has_a_control_and_a_way_of_checking_it() -> None:
+    """A control nobody ever runs is a sentence. The milestone asked for egress
+    verified absent by test rather than by configuration review, and this holds
+    every row of the threat model to that, not only the egress one."""
+    rows = node.defences()
+    assert node.scope_problems(rows) == []
+    assert len(rows) >= 5
+
+
+def test_the_threat_model_names_the_things_a_sandbox_is_for() -> None:
+    """Named rather than counted, because a threat model that loses the escape
+    row and keeps the mining row still passes a count."""
+    threats = " ".join(row.threat.lower() for row in node.defences())
+    for must in ("escape", "persistence", "third parties", "exhaustion", "denial of service"):
+        assert must in threats
+
+
+def test_a_control_with_no_check_against_it_is_refused(tmp_path: Path) -> None:
+    page = tmp_path / "scope.md"
+    page.write_text(
+        "# Scope\n\n"
+        f"{node.DEFENDED}\n\n"
+        "| Threat | Control | How it is checked |\n"
+        "| --- | --- | --- |\n"
+        "| Escape | The jailer | It runs on every deploy |\n"
+        "| Egress | No route off the bridge |  |\n",
+        encoding="utf-8",
+    )
+    assert any("no way of checking it" in one for one in node.scope_problems(node.defences(page)))
+
+
+def test_a_scope_statement_with_no_threats_in_it_is_refused(tmp_path: Path) -> None:
+    page = tmp_path / "scope.md"
+    page.write_text(f"# Scope\n\n{node.DEFENDED}\n\nNothing here yet.\n", encoding="utf-8")
+    assert any("not a threat model" in one for one in node.scope_problems(node.defences(page)))
+
+
+def test_the_scope_statement_is_published_rather_than_kept_in_the_repository() -> None:
+    """Published is the word the milestone used. A threat model nobody outside
+    the project can read is a threat model nobody outside the project reviews,
+    so the page is staged as part of the site like any other."""
+    staged = {source: name for name, source, _ in sitebuild.TOP}
+    assert node.SCOPE in staged
+
+
 def test_the_current_rung_carries_a_reason(real: node.Ladder) -> None:
     assert len(real.why.split()) > 10
     assert real.since

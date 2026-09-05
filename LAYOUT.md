@@ -121,11 +121,13 @@ Small programs, standard library only wherever possible, so they run in seconds 
 
 ## node
 
-`ladder.toml`, and nothing else. The Node is the hosted sandbox a badge opens, and this file says how it gets worse: four rungs, each one taking something more away from the reader, and which rung it is standing on today.
+Two files. `ladder.toml` says how the hosted sandbox gets worse: four rungs, each one taking something more away from the reader, and which rung it is standing on today. `scope.md` says what the sandbox defends against and what it does not, and it is published as a page of the site.
 
 The badge on every staged lesson page is generated from it, which is what stops the ladder from being a paragraph in a design document. A rung that would leave a reader looking at a dead link fails `just node-check` instead.
 
 The bottom rung is the Node being gone. Its badge points at the recorded corpus, the whole book still reads, and every number on every page is still there, because the corpus was built before the sandbox for exactly this reason.
+
+The scope statement is checked as well as linted. Every threat in it carries a control and a way of checking that control, because a defence nobody ever runs is a sentence.
 
 ## site
 

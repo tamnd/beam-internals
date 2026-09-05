@@ -18,8 +18,8 @@ its own recorded output, so `tests/test_node.py` checks it by reading the pages
 rather than by believing this paragraph.
 
 Run:
-  python3 -m tools.node            the ladder, and the badge for each rung
-  python3 -m tools.node --check    the file is well formed and the links resolve
+  python3 -m tools.node            the ladder, the threat model, and each badge
+  python3 -m tools.node --check    both files are well formed and the links resolve
 """
 
 from __future__ import annotations
@@ -30,6 +30,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 LADDER = Path("node/ladder.toml")
+SCOPE = Path("node/scope.md")
+
+# The heading in the scope statement whose table is the threat model. Named
+# here because the table is parsed, and a heading that gets reworded should
+# fail loudly rather than quietly leave the model empty.
+DEFENDED = "## What is defended"
 
 # Every field a rung has to carry. A rung missing one of these is a rung that
 # renders half a badge, so it is caught here rather than by a reader.
@@ -59,6 +65,13 @@ TONES = {"success", "info", "warning", "danger"}
 
 class Broken(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class Defence:
+    threat: str
+    control: str
+    checked: str
 
 
 @dataclass(frozen=True)
@@ -228,6 +241,49 @@ def badge(ladder: Ladder, lesson: str, rung: Rung | None = None, depth: int = 2)
     )
 
 
+def defences(path: Path = SCOPE) -> list[Defence]:
+    """The threats the scope statement says the sandbox stops, and how each one is checked.
+
+    Read out of the table rather than kept in a second file, because a scope
+    statement and a list of controls that can disagree with each other will.
+    """
+    if not path.exists():
+        raise Broken(f"{path} is not there, and it is the statement of what the sandbox is for")
+
+    rows: list[Defence] = []
+    inside = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("## "):
+            inside = line.strip() == DEFENDED
+            continue
+        if not inside or not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) != 3 or cells[0] in ("Threat", "") or set(cells[0]) <= {"-", " "}:
+            continue
+        rows.append(Defence(*cells))
+    return rows
+
+
+def scope_problems(rows: list[Defence]) -> list[str]:
+    """A control with no way of being checked is a sentence, not a defence.
+
+    This is the exit criterion the milestone wrote down as egress verified
+    absent by test rather than by configuration review, applied to every row
+    instead of to that one.
+    """
+    found: list[str] = []
+    if len(rows) < 2:
+        found.append(f"{SCOPE} lists {len(rows)} threats under {DEFENDED!r}, which is not a threat model")
+        return found
+    for row in rows:
+        if not row.control:
+            found.append(f"{SCOPE}: {row.threat!r} has no control against it")
+        if not row.checked:
+            found.append(f"{SCOPE}: {row.threat!r} has a control and no way of checking it")
+    return found
+
+
 def describe(ladder: Ladder) -> str:
     lines = [
         f"the Node is on rung {ladder.standing_on}, {ladder.current.name}, since {ladder.since}",
@@ -255,17 +311,32 @@ def main(argv: list[str]) -> int:
         print(f"node: {broken}")
         return 1
 
-    found = problems(ladder)
+    try:
+        rows = defences()
+    except Broken as broken:
+        print(f"node: {broken}")
+        return 1
+
+    found = problems(ladder) + scope_problems(rows)
     for problem in found:
         print(f"node: {problem}")
     if found:
         return 1
 
     if "--check" in argv:
-        print(f"node: {len(ladder.rungs)} rungs, standing on {ladder.standing_on}, {ladder.current.name}")
+        print(
+            f"node: {len(ladder.rungs)} rungs, standing on {ladder.standing_on}, "
+            f"{ladder.current.name}, {len(rows)} threats with a control and a check"
+        )
         return 0
 
     print(describe(ladder))
+    print(f"what the sandbox is for, from {SCOPE}")
+    print()
+    for row in rows:
+        print(f"  {row.threat}")
+        print(f"     checked by {row.checked}")
+    print()
     print("the badge each rung puts on a lesson page, here for t07")
     print()
     for rung in ladder.rungs:

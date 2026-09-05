@@ -27,6 +27,7 @@ TOP = [
     ("index.md", Path("README.md"), "Home"),
     ("layout.md", Path("LAYOUT.md"), "Layout"),
     ("corpus.md", Path("corpora/README.md"), "Corpus"),
+    ("node.md", Path("node/scope.md"), "The Node sandbox"),
     ("contributing.md", Path("CONTRIBUTING.md"), "Contributing"),
     ("notation.md", Path("blueprints/NOTATION.md"), "Blueprint notation"),
 ]

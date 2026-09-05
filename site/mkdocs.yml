@@ -62,6 +62,7 @@ nav:
   - Home: index.md
   - Layout: layout.md
   - Corpus: corpus.md
+  - The Node sandbox: node.md
   - Contributing: contributing.md
   - Blueprint notation: notation.md
   - Lessons:
