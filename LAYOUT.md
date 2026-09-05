@@ -14,6 +14,7 @@ beam-internals/
   bxtrace/           the tape recorders
   bxmanim/           the animation vocabulary
   tools/             the checkers and the generators
+  node/              the degradation ladder for the hosted sandbox
   conformance/       the oracle stack and the scorecard
   capstones/         reference implementations
   site/              the book site
@@ -115,7 +116,16 @@ Small programs, standard library only wherever possible, so they run in seconds 
 | `dis` | Prints a disassembly tape as a memory layout, so the opcodes the loader chose can be read without an interpreter build. |
 | `jdump` | Prints a native code tape, and puts two of them side by side, so what the JIT emitted on each architecture can be compared without owning both machines. |
 | `wire` | Decodes a distribution handshake off a wire tape, recomputes both digests from the cookie, and names every flag the two sides offered. |
+| `node` | Reads the degradation ladder and renders the badge that sitebuild puts on every lesson page. |
 | `drift` | Watches upstream and opens issues. Never edits content. |
+
+## node
+
+`ladder.toml`, and nothing else. The Node is the hosted sandbox a badge opens, and this file says how it gets worse: four rungs, each one taking something more away from the reader, and which rung it is standing on today.
+
+The badge on every staged lesson page is generated from it, which is what stops the ladder from being a paragraph in a design document. A rung that would leave a reader looking at a dead link fails `just node-check` instead.
+
+The bottom rung is the Node being gone. Its badge points at the recorded corpus, the whole book still reads, and every number on every page is still there, because the corpus was built before the sandbox for exactly this reason.
 
 ## site
 

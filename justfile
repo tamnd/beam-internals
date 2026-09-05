@@ -7,7 +7,7 @@ set shell := ["bash", "-uc"]
 # The full set, same order as ci.yml
 default: check
 
-check: prose ledger blueprints bpc-check citations corpus bake-offline site-check
+check: prose ledger blueprints node-check bpc-check citations corpus bake-offline site-check
     @echo "all checks passed"
 
 # House style. Catches the em dash, the banned words, sentences wrapped across
@@ -22,6 +22,15 @@ ledger:
 # Blueprints have their nine sections, in order, and do not lean on a lesson.
 blueprints:
     python3 -m tools.bplint
+
+# The degradation ladder for the Node, and the badge each rung puts on a lesson
+# page. The Node is on the bottom rung today, which is why every lesson links to
+# the recorded corpus rather than to a sandbox.
+node:
+    python3 -m tools.node
+
+node-check:
+    python3 -m tools.node --check
 
 # Regenerate the blueprint regions that come from the VM's own tables. Needs the
 # pinned tree, and does nothing without it.

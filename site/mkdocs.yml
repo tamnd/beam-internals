@@ -61,6 +61,7 @@ extra:
 nav:
   - Home: index.md
   - Layout: layout.md
+  - Corpus: corpus.md
   - Contributing: contributing.md
   - Blueprint notation: notation.md
   - Lessons:
