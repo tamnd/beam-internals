@@ -17,6 +17,9 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest==9.1.1", "ruff==0.16.5", "yamllint==1.38.0", "zizmor==1.30.0"]
 site = ["mkdocs==1.6.1", "mkdocs-material==9.7.7", "mike==2.2.0"]
+# Manim is the heaviest thing in the repository and nothing in `just check`
+# needs it, so it stays out of dev. Install it when you are drawing.
+anim = ["manim==0.19.0"]
 
 [project.scripts]
 lintprose = "tools.lintprose:main"

@@ -68,6 +68,21 @@ conformance *suites:
 conformance-list:
     ./conformance/run.escript --list
 
+# Render one animation and its still. The still lands where the scene file says
+# it belongs, which is next to the lesson that shows it. Needs the anim extra,
+# which is not installed by `just setup` because Manim is large and no gate
+# needs it.
+anim scene:
+    python3 -m tools.figures {{ scene }}
+
+# Just the still, which takes seconds rather than a minute.
+anim-still scene:
+    python3 -m tools.figures {{ scene }} --still-only
+
+# Every scene, which is what you run after changing the vocabulary.
+anim-all:
+    python3 -m tools.figures
+
 # Read upstream and report what has moved away from the pin. Exits 1 when
 # something has, which is what the weekly job turns into an issue.
 drift:
@@ -92,6 +107,10 @@ lint-workflows:
 # Install everything a contributor needs
 setup:
     python3 -m pip install -e ".[dev,site]"
+
+# Manim, separately, because it is large and only needed for drawing.
+setup-anim:
+    python3 -m pip install -e ".[anim]"
 
 # Fetch the pinned OTP tree. Large, and only needed for citations-strict.
 pin:
