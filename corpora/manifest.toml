@@ -84,6 +84,45 @@ needed_by = ["m21"]
 bytes = 1000
 sha256 = "e7a5e82f2ac247558f11f1e81b8c75fafbd6fb99d99c3f5e60a5baad0bb9e652"
 
+# The two native code tapes, which are the other half of the pair above. The dis
+# tapes are what the interpreter runs and these are what the JIT emitted for the
+# same module of the same release, so the two can be put next to each other.
+# There are two of them because the JIT emits a different instruction set on each
+# machine, and the interesting part is that the difference is not only in the
+# native code, it reaches back into which BEAM instructions the loader picked.
+# Neither can be recorded on the machine the other one came from and neither can
+# be recorded on the interpreter build at all.
+
+[[artefact]]
+path = "jdump/l1-aarch64.tape.gz"
+produced_by = "./bxtrace/record.escript l1-jdump-aarch64"
+kind = "jdump"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the same module on AArch64, so the two can be put side by side"
+needed_by = ["m26"]
+bytes = 2711
+sha256 = "854705b29213403119c555bf7abc4117b7250b056d9c04a7ca34016e53e88451"
+
+[[artefact]]
+path = "jdump/l1-x86_64.tape.gz"
+produced_by = "./bxtrace/record.escript l1-jdump-x86_64"
+kind = "jdump"
+flavor = "jit"
+arch = "x86_64"
+os = "linux 6.8.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "what the JIT emitted for a six line module on x86-64"
+needed_by = ["m26"]
+bytes = 2852
+sha256 = "31e3dfe18134f4658b03d7826ddc8200f6b7ccadf99eabf57671d72e5aa50e2f"
+
 [[artefact]]
 path = "traces/one-spinner.tape.gz"
 produced_by = "./bxtrace/record.escript one-spinner"

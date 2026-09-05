@@ -85,6 +85,7 @@ bxtrace/
   src/bxtrace_pass.erl   the pass tape, what the compiler did to a module
   src/bxtrace_post.erl   the postmortem tape, a crash dump turned into an index
   src/bxtrace_dis.erl    the disassembly tape, what the loader left in memory
+  src/bxtrace_jdump.erl  the native code tape, what the JIT emitted for a module
   src/bxtrace_specimen.erl  the fourteen crash dumps, and how each one is produced
   test/                  the tests, run by test.escript
   test.escript           our own code, needs a release and nothing else
@@ -110,6 +111,7 @@ Small programs, standard library only wherever possible, so they run in seconds 
 | `bake` | Runs every cell of every lesson the way Livebook runs them, and compares what came out against `expected/`. |
 | `normalise` | Erases the pids, ports, references, durations, paths and node names that stop a cell's output from being compared. |
 | `dis` | Prints a disassembly tape as a memory layout, so the opcodes the loader chose can be read without an interpreter build. |
+| `jdump` | Prints a native code tape, and puts two of them side by side, so what the JIT emitted on each architecture can be compared without owning both machines. |
 | `drift` | Watches upstream and opens issues. Never edits content. |
 
 ## site

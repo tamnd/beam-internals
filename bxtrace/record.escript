@@ -55,14 +55,17 @@ list() ->
     [io:format("~-26s  ~ts~ts~n", [Name, note(Spec), maps:get(why, Spec)]) || {Name, Spec} <- recordings()],
     halt(0).
 
-%% A recording that needs a particular build says so in the listing, so that
+%% A recording that needs a particular machine says so in the listing, so that
 %% somebody deciding what to re record can see it before running it rather than
 %% after.
 note(Spec) ->
-    case maps:get(needs, Spec, any) of
-        any -> "";
-        Flavor -> io_lib:format("[needs the ~w flavor] ", [Flavor])
+    case maps:get(needs, Spec, []) of
+        [] -> "";
+        Needs -> io_lib:format("[needs ~ts] ", [lists:join(" and ", [wants(N) || N <- Needs])])
     end.
+
+wants({flavor, Flavor}) -> io_lib:format("the ~w flavor", [Flavor]);
+wants({arch, Arch}) -> io_lib:format("~ts", [Arch]).
 
 %% ---------------------------------------------------------------------------
 %% What there is to record
@@ -115,7 +118,7 @@ fixed() ->
         {"l1-dis", #{
             path => "dis/l1.tape.gz",
             kind => dis,
-            needs => emu,
+            needs => [{flavor, emu}],
             why => "the opcodes the loader chose for a six line module, none of which the compiler emitted",
             needed_by => ["m21"],
             record => fun(Root, By, Path) ->
@@ -131,7 +134,7 @@ fixed() ->
         {"spinner-dis", #{
             path => "dis/spinner.tape.gz",
             kind => dis,
-            needs => emu,
+            needs => [{flavor, emu}],
             why => "the smallest loop there is, so the cost of one iteration can be counted in instructions",
             needed_by => ["m21"],
             record => fun(Root, By, Path) ->
@@ -141,6 +144,38 @@ fixed() ->
                         "the smallest loop there is, so the cost of one iteration can be counted "
                         "in instructions",
                     source => filename:join([Root, "corpora", "src", "spinner.erl"])
+                })
+            end
+        }},
+        %% The two native code tapes. Same module, same release, two instruction
+        %% sets, which is the pair the comparison is made from. Both need the
+        %% JIT, so they are the other half of the pair above and cannot be
+        %% recorded on the same machine as it.
+        {"l1-jdump-x86_64", #{
+            path => "jdump/l1-x86_64.tape.gz",
+            kind => jdump,
+            needs => [{flavor, jit}, {arch, "x86_64"}],
+            why => "what the JIT emitted for a six line module on x86-64",
+            needed_by => ["m26"],
+            record => fun(Root, By, Path) ->
+                bxtrace_jdump:record(Path, #{
+                    by_whom => By,
+                    why => "what the JIT emitted for a six line module on x86-64",
+                    source => filename:join([Root, "corpora", "src", "l1.erl"])
+                })
+            end
+        }},
+        {"l1-jdump-aarch64", #{
+            path => "jdump/l1-aarch64.tape.gz",
+            kind => jdump,
+            needs => [{flavor, jit}, {arch, "aarch64"}],
+            why => "the same module on AArch64, so the two can be put side by side",
+            needed_by => ["m26"],
+            record => fun(Root, By, Path) ->
+                bxtrace_jdump:record(Path, #{
+                    by_whom => By,
+                    why => "the same module on AArch64, so the two can be put side by side",
+                    source => filename:join([Root, "corpora", "src", "l1.erl"])
                 })
             end
         }},
@@ -171,25 +206,32 @@ run(Root, _Out, By, Names) ->
 run_what_it_can(Root, Out, By, Specs) ->
     lists:foreach(
         fun({Name, Spec}) ->
-            io:format("%% skipped ~ts: this emulator is the ~w flavor and that tape needs ~w~n", [
-                Name, erlang:system_info(emu_flavor), maps:get(needs, Spec)
+            io:format("%% skipped ~ts: this is a ~w ~ts machine and that tape needs ~ts~n", [
+                Name,
+                erlang:system_info(emu_flavor),
+                arch(erlang:system_info(system_architecture)),
+                lists:join(" and ", [wants(N) || N <- unmet(Spec)])
             ])
         end,
         [Pair || {_, Spec} = Pair <- Specs, skip(Spec)]
     ),
     run(Root, Out, By, [Name || {Name, Spec} <- Specs, not skip(Spec)]).
 
-%% Some recordings only work on an emulator built a particular way, and the
-%% flavor is the one that comes up so far: a disassembly tape needs the
-%% interpreter, and a stock release is the JIT. Asked for by name it refuses,
-%% because somebody typed that name and wants the tape. Reached through `--all'
-%% it says what it skipped and carries on, because `--all' on a laptop should
-%% re record everything a laptop can and then tell you what it could not.
-skip(Spec) ->
-    case maps:get(needs, Spec, any) of
-        any -> false;
-        Flavor -> erlang:system_info(emu_flavor) =/= Flavor
-    end.
+%% Some recordings only work on a particular machine. Two things come up so far.
+%% A disassembly tape needs the interpreter and a stock release is the JIT, and
+%% a native code dump needs the JIT and exists once per instruction set, so the
+%% pair of them has to be recorded on two machines.
+%%
+%% Asked for by name it refuses, because somebody typed that name and wants the
+%% tape. Reached through `--all' it says what it skipped and carries on, because
+%% `--all' on a laptop should re record everything a laptop can and then tell
+%% you what it could not.
+skip(Spec) -> unmet(Spec) =/= [].
+
+unmet(Spec) -> [Need || Need <- maps:get(needs, Spec, []), not met(Need)].
+
+met({flavor, Flavor}) -> erlang:system_info(emu_flavor) =:= Flavor;
+met({arch, Arch}) -> arch(erlang:system_info(system_architecture)) =:= Arch.
 
 spec(Name) ->
     case lists:keyfind(Name, 1, recordings()) of

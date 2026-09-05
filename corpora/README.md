@@ -91,6 +91,57 @@ A build that small has no crypto, so the recorder cannot work out a sha256 for t
 ./bxtrace/record.escript --entry l1-dis     anywhere, once the tape is in place
 ```
 
+## The native code tapes
+
+Two of them, under `jdump/`, and they are the other half of the pair above. The disassembly tapes are what the interpreter runs. These are what the JIT emitted for the same module of the same release, one on x86-64 and one on AArch64.
+
+`erl +JDdump true` makes the JIT write one `<module>.asm` file for every module it compiles, which is every module it loads, including the hundred or so a bare node loads on the way up. The flag is read once at startup, at `erts/emulator/beam/erl_init.c:150@OTP-29.0.5`, so it cannot be turned on from inside a running node. The recorder starts a child with the flag set, in a directory of its own, and keeps the one file it asked for.
+
+What makes the dump readable is that the assembler is told to log the name of the BEAM instruction before emitting the code for it, at `erts/emulator/beam/jit/arm/beam_asm_module.cpp:458@OTP-29.0.5` and at the same place in the x86 assembler. So the file arrives already grouped by BEAM instruction, and the grouping is the emulator's own rather than something guessed at here.
+
+Read one with `just jdump`, and put both side by side with `just jdump-compare`. Neither needs a runtime.
+
+```
+python3 -m tools.jdump corpora/jdump/l1-x86_64.tape.gz
+python3 -m tools.jdump --compare corpora/jdump/l1-x86_64.tape.gz corpora/jdump/l1-aarch64.tape.gz
+```
+
+The comparison is what the pair was recorded for.
+
+```
+module l1, 2 architectures
+
+                             x86_64  aarch64
+BEAM instructions                56       61
+distinct BEAM instructions       19       20
+native instructions             129      132
+modules compiled at boot        110      109
+
+BEAM instruction          x86_64  aarch64
+i_flush_stubs                  .        5
+i_minus_jIssd                  .        1
+i_minus_ssjd                   1        .
+i_plus_jIssd                   .        2
+i_plus_ssjd                    2        .
+```
+
+It would be no surprise that two machines have different native code. The surprise is that the difference reaches back into which BEAM instructions the loader picked, for one beam file on one release. `i_plus s s j d` is in the x86 table at `erts/emulator/beam/jit/x86/ops.tab:1232@OTP-29.0.5` and `i_plus j I s s d` is in the AArch64 table at `erts/emulator/beam/jit/arm/ops.tab:1305@OTP-29.0.5`, and the loader picks from whichever table its emulator was built with. Neither of them is `i_plus_xxjd`, which is what the interpreter picks for the same line of source.
+
+`i_flush_stubs` exists only on AArch64, at `erts/emulator/beam/jit/arm/ops.tab:951@OTP-29.0.5`, where the emulator's own comment says it flushes veneers before entering a new function. A branch on AArch64 does not reach the whole address space, so anything far away needs a small trampoline, and the assembler is told where the safe places to put one are.
+
+Nothing on either tape is an address. A stub jumping into the emulator's C code shows up as `mov x14, 4412950416`, which is a different number on every run of the same machine, so any operand that wide is replaced by `addr(N)` against a table kept only while recording. The runs of `.byte` go the same way and for a second reason: they hold the module's own metadata, which includes the full path of the file it was compiled from, so copying them onto a tape would publish a directory off somebody's machine. What is kept is the label and the byte count.
+
+### Recording them again
+
+Both need a stock release, because the interpreter has no JIT to dump and the recorder refuses on it rather than writing an empty tape. They also need one machine of each architecture, which is the part that cannot be worked around: an x86-64 machine cannot produce the AArch64 tape and neither of them can produce the disassembly tape.
+
+```
+./bxtrace/record.escript --by you l1-jdump-x86_64     on an x86-64 release
+./bxtrace/record.escript --by you l1-jdump-aarch64    on an AArch64 release
+```
+
+`--list` marks each one with what it needs, and running everything on a machine that cannot record one of them says so and skips it rather than failing.
+
 ## The crash dump specimens
 
 Fourteen of them, under `dumps/`. Reading a dump is a skill and a skill needs examples, so each one is a node made to die in a particular way.
