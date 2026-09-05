@@ -87,6 +87,12 @@ bake-offline:
 filters:
     python3 -m tools.normalise
 
+# A disassembly tape, printed as the memory layout it is. Needs no runtime,
+# which is the point: the tape was recorded once on an emulator built
+# `--disable-jit', because a stock release ships the JIT and cannot produce it.
+dis tape="corpora/dis/l1.tape.gz":
+    python3 -m tools.dis {{ tape }}
+
 # The conformance suites, against whatever release is on the path. Needs an
 # Erlang release and nothing else, which is the whole design of the runner. Not
 # part of `check`, because `check` has to run on a machine with no Erlang.

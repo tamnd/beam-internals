@@ -137,9 +137,12 @@ pin(Root) ->
 
 run(Root, Suites) ->
     Results = [run_suite(Root, S) || S <- Suites],
-    Failed = lists:sum([F || {_, _, F} <- Results]),
-    Total = lists:sum([T || {_, T, _} <- Results]),
-    io:format("~n~b cases, ~b passed, ~b failed~n", [Total, Total - Failed, Failed]),
+    Failed = lists:sum([F || {_, _, F, _} <- Results]),
+    Skipped = lists:sum([S || {_, _, _, S} <- Results]),
+    Total = lists:sum([T || {_, T, _, _} <- Results]),
+    io:format("~n~b cases, ~b passed, ~b failed, ~b skipped~n", [
+        Total, Total - Failed - Skipped, Failed, Skipped
+    ]),
     case Failed of
         0 -> 0;
         _ -> 1
@@ -150,13 +153,19 @@ run_suite(Root, Suite) ->
     io:format("~s  checks ~s~n", [Suite, Blueprint]),
     ok = check_blueprint_agrees(Root, Suite, Blueprint),
     Cases = Suite:cases(),
-    Failures = lists:foldl(
-        fun(Case, Acc) -> Acc + run_case(Case) end,
-        0,
+    {Failures, Skips} = lists:foldl(
+        fun(Case, {F, S}) ->
+            case run_case(Case) of
+                fail -> {F + 1, S};
+                skip -> {F, S + 1};
+                pass -> {F, S}
+            end
+        end,
+        {0, 0},
         Cases
     ),
     io:nl(),
-    {Suite, length(Cases), Failures}.
+    {Suite, length(Cases), Failures, Skips}.
 
 %% A suite says which blueprint it checks and the blueprint says which suite
 %% checks it. Neither is worth much alone, so the runner insists the two agree
@@ -190,6 +199,7 @@ run_case({Id, _Tier, Title, Fun}) ->
         try Fun() of
             _ -> pass
         catch
+            throw:{ct_skipped, Why} -> {skip, Why};
             throw:{ct_failed, What, Detail} -> {fail, What, Detail};
             Class:Reason:Stack -> {crash, Class, Reason, Stack}
         end,
@@ -198,14 +208,18 @@ run_case({Id, _Tier, Title, Fun}) ->
 
 report(Id, _Title, Took, pass) ->
     io:format("  pass  ~-28s ~5b ms~n", [Id, Took]),
-    0;
+    pass;
+report(Id, Title, _Took, {skip, Why}) ->
+    io:format("  skip  ~-28s ~ts~n", [Id, Title]),
+    io:format("        ~ts~n", [Why]),
+    skip;
 report(Id, Title, _Took, {fail, What, Detail}) ->
     io:format("  FAIL  ~-28s ~ts~n", [Id, Title]),
     io:format("        ~ts~n", [What]),
     io:format("        ~P~n", [Detail, 12]),
-    1;
+    fail;
 report(Id, Title, _Took, {crash, Class, Reason, Stack}) ->
     io:format("  CRASH ~-28s ~ts~n", [Id, Title]),
     io:format("        ~p:~P~n", [Class, Reason, 12]),
     lists:foreach(fun(Frame) -> io:format("        ~P~n", [Frame, 8]) end, lists:sublist(Stack, 5)),
-    1.
+    fail.

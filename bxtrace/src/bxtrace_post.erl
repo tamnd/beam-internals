@@ -58,7 +58,7 @@
 
 -module(bxtrace_post).
 
--export([record/2]).
+-export([record/2, digest_check/0]).
 
 %% Every tag, from the list in the viewer, with `end' and `fun' spelled the way
 %% the file spells them. A tag not on this list still goes on the tape, as a
@@ -120,6 +120,8 @@ record(Path, Opts) ->
     Dump = maps:get(dump, Opts),
     ByWhom = maps:get(by_whom, Opts),
     Why = maps:get(why, Opts),
+
+    ok = digest_check(),
 
     %% The whole file at once. A dump from a node that died with a hundred
     %% thousand processes can be gigabytes and this would be the wrong way to
@@ -310,5 +312,27 @@ content(Tape, At, {N, Line}) ->
 blob(At, Body) ->
     Joined = iolist_to_binary(lists:join($\n, Body)),
     {blob, At, length(Body), byte_size(Joined), binary:encode_hex(crypto:hash(sha256, Joined), lowercase)}.
+
+%% Whether a digest can be computed at all, checked once before anything is read
+%% rather than found out halfway through the first blob section.
+%%
+%% A release you installed has crypto. A local build configured `--without-ssl'
+%% does not, and that is not a strange thing to have around here, because the
+%% interpreter build the disassembly tapes come from is configured that way to
+%% keep it down to twenty five minutes. Without a digest a postmortem tape would
+%% still be written and would still read back, and the one thing it would stop
+%% doing is telling two different heaps apart, which is most of why the blob
+%% summary is on the tape. So the recorder stops instead.
+digest_check() ->
+    case code:ensure_loaded(crypto) of
+        {module, crypto} ->
+            ok;
+        {error, Reason} ->
+            error({bxtrace_post,
+                "this emulator has no crypto (" ++ atom_to_list(Reason) ++ "), so a blob section "
+                "cannot be given a digest, and a postmortem tape without one cannot tell two "
+                "different heaps apart. A build configured --without-ssl is the usual reason. "
+                "Record the dump specimens on an ordinary release instead."})
+    end.
 
 numbered(Items) -> lists:zip(lists:seq(1, length(Items)), Items).

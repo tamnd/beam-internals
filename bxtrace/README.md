@@ -8,7 +8,7 @@ Recorders are deliberately dull. They set trace flags, they read counters, they 
 
 ## The tape format
 
-A tape is a recording of something the VM did, kept so it can be replayed by somebody who was not there. There are three kinds, and they share one format so that a widget able to draw one does not need a second parser for the next.
+A tape is a recording of something the VM did, kept so it can be replayed by somebody who was not there. There are four kinds, and they share one format so that a widget able to draw one does not need a second parser for the next.
 
 ```
 corpora/traces/four-spinners.tape.gz
@@ -45,7 +45,7 @@ Every fact a machine can state about itself is filled in by `bxtrace_tape:header
 | field | why it is there |
 | --- | --- |
 | `schema` | A reader meeting a tape from the future says so rather than guessing. |
-| `kind` | `reds`, `pass` or `postmortem`. |
+| `kind` | `reds`, `pass`, `dis` or `postmortem`. |
 | `recorded`, `by_whom`, `why` | Provenance. The same rule `corpora/manifest.toml` states. |
 | `otp`, `erts`, `build` | Two builds of the same release do not behave the same. |
 | `arch`, `wordsize` | Heap words are a different number of bytes on each. |
@@ -101,6 +101,24 @@ The workload's number holds to within eight reductions on each machine and start
 
 That covers the workload and not the other processes on the tape, which is the honest limit of what can be measured from outside a process. Getting a count per slice for everything needs a tracer written as a NIF, because that callback runs in the context of the traced process rather than in a collector of its own. The schema has room for it and it is not needed for the figure the reduction tape exists to draw.
 
+## The two flavors do not count them the same way
+
+Both numbers in the table above came off a stock release, which is the JIT. The same loop on an emulator configured `--disable-jit` comes out lower, and not by a wandering amount.
+
+| iterations | JIT, minus the iteration count | interpreter, minus the iteration count |
+| --- | --- | --- |
+| 4000 | 3 | 4 |
+| 50000 | 3 | -7 |
+| 200000 | 3 | -45 |
+| 400000 | 3 | -95 |
+| 800000 | 3 | -195 |
+
+The JIT column is a constant. One reduction per call, plus three for the call into the loop and the read that follows it, and it does not move with the size of the loop.
+
+The interpreter column falls by one for every four thousand iterations, which is the default slice. So the interpreter charges one reduction less each time the loop is scheduled out and back in, and a long loop ends up about one part in four thousand cheaper there than the same loop under the JIT. Every number in both columns repeated exactly across five runs, so this is arithmetic rather than noise.
+
+It matters here only because the tests say what the loop cost and they have to hold on both, so the floor in `bxtrace_reds_test` allows one lost reduction per slice. It matters more generally because a reduction is the unit the scheduler is fair in, and two emulators of the same release disagreeing about how many of them a loop took is worth knowing before quoting one.
+
 ## The pass tape
 
 `bxtrace_pass:record/2` compiles a module and writes down what the compiler did to it.
@@ -149,6 +167,49 @@ Each stopping point gets its own compile, because a compile can only stop once. 
 Which file a stopping point writes is not guessed at. `to_core` writes `l1.core` and `to_asm` writes `l1.S`, but `to_exp` writes `l1.abstr` under the same name `to_abstr` uses, `dexp` writes `l1.expand`, and `to_dis` writes a beam file as well as its listing. So the compile runs into an empty directory and whatever turns up in it is the answer, minus any beam file, because a beam file is the output rather than a stage on the way to it.
 
 A stage's text goes on the tape as one binary, so a two hundred line listing is one line of tape with its newlines escaped. That looks odd the first time and it is the rule the whole format rests on.
+
+## The disassembly tape
+
+`bxtrace_dis:record/2` loads a module and writes down what the loader left in memory.
+
+```erlang
+{ok, Result} = bxtrace_dis:record("corpora/dis/l1.tape.gz",
+                                  #{by_whom => "tamnd",
+                                    why     => "the opcodes the loader chose",
+                                    source  => "corpora/src/l1.erl"}).
+```
+
+The finding it exists for: not one instruction in memory is the instruction the compiler emitted. The beam file for `add(A, B) -> A + B` holds `gc_bif2`, and what is loaded is `i_plus_xxjd`, where the suffix is the loader saying it has already worked out that both operands are x registers and the result goes in one. The accumulator loop in `fib/3` arrives as `i_increment_rWd` followed by `swap_xx`, and neither of those names appears anywhere in the compiler.
+
+```erlang
+{function,3,<<"fib">>,3,7,160}.
+{instruction,8,3,0,40,<<"i_func_info_IaaI">>,<<"0 `l1` `fib` 3">>}.
+{instruction,9,3,40,24,<<"i_is_eq_exact_immed_frc">>,<<"f(@11) r(0) `0`">>}.
+{instruction,10,3,64,16,<<"move_return_x">>,<<"x(1)">>}.
+{instruction,11,3,80,24,<<"i_increment_rWd">>,<<"r(0) -1 x(0)">>}.
+```
+
+A function is `{function, At, Name, Arity, Instructions, Bytes}` and an instruction is `{instruction, At, Function, Offset, Bytes, Op, Args}`. The offset is measured from the start of the function and the size is measured to the next instruction, so the sizes of a function's instructions add up to its size exactly. There is a test for that, because it is the check that would catch a walk that stopped early.
+
+`Bytes` is the interesting column. Divide it by the word size and a `return` is one word, `move_return_x` is two, and `i_plus_xxjd` is three. The first word holds the address of the C code that runs the instruction and everything after it is an operand sitting inline in the code, which is what threaded code means and what makes the whole module a run of words rather than a stream of bytes to decode.
+
+### Nothing on the tape is an address
+
+A printed disassembly starts every line with the machine address of the instruction, and prints a branch target the same way, so the same module disassembled twice on the same machine gives two different files. Both go.
+
+An instruction records its offset from the start of its function. A branch target that names another instruction in this module is rewritten to `@` and that instruction's index, so `f(00007FC7C2FC8348)` becomes `f(@11)`. Two machines that loaded the same module then produce byte identical rows, which is what makes a tape recorded on one worth reading on another.
+
+Anything that looks like an address and is not one of the module's own instructions is left alone and counted in the header as `unresolved_addresses`. It is zero on both corpus tapes. Quietly replacing something nobody checked is how a tape ends up describing something that was never there.
+
+### This one needs a build
+
+`erts_debug:disassemble/1` is inside `#ifndef BEAMASM` and the JIT half of it is one line returning false, at `erts/emulator/beam/beam_debug.c:512@OTP-29.0.5`. A stock release ships the JIT flavor only. So on any machine you can set up with a package manager, `erts_debug:df/1` opens a file, writes nothing to it and reports `ok`.
+
+The recorder refuses on the JIT rather than writing an empty tape, and says why. `corpora/README.md` has the configure line and the two step recording, which is two steps because a build small enough to be quick has no crypto in it and cannot work out the sha256 for its own manifest entry.
+
+### Why not keep the output of erts_debug:df/1
+
+`df/1` is a loop over `erts_debug:disassemble/1` that throws away everything except the printed line, at `lib/kernel/src/erts_debug.erl:436@OTP-29.0.5`. The BIF hands back the address of the next instruction and the MFA the current one belongs to, and both are gone by the time the text reaches the file. Calling it directly keeps them, which is where every instruction's size and every function boundary comes from without parsing anything back out.
 
 ## The postmortem tape
 
@@ -247,5 +308,7 @@ ok = bxtrace_tape:describe(Path).
 just bxtrace-test              every module
 just bxtrace-test bxtrace_tape one of them
 ```
+
+Most of the disassembly tests report as skipped, with the reason next to them and the count in the summary. They need an emulator built `--disable-jit` and you are almost certainly not sitting on one. A skipped case is not a passing case and the runner does not pretend otherwise.
 
 These are separate from the conformance suites because the two answer different questions. A conformance suite asks whether the runtime still behaves the way a blueprint says, and a failure there is news about Erlang. These ask whether our own code works, and a failure here is news about us. They do share an assertion vocabulary, because there is no reason for one repository to have two of those.

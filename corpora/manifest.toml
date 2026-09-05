@@ -55,6 +55,36 @@ bytes = 2714
 sha256 = "872d2470e1d3d69b2e154f4f0d2175094815346230294143b9055ac7ec8b98a7"
 
 [[artefact]]
+path = "dis/l1.tape.gz"
+produced_by = "./bxtrace/record.escript l1-dis"
+kind = "dis"
+flavor = "emu"
+arch = "x86_64"
+os = "linux 6.8.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the opcodes the loader chose for a six line module, none of which the compiler emitted"
+needed_by = ["m21"]
+bytes = 1341
+sha256 = "9add001a5e5cd7f8f9d6234290d10f25bb089624efb824b67dabe8813590743a"
+
+[[artefact]]
+path = "dis/spinner.tape.gz"
+produced_by = "./bxtrace/record.escript spinner-dis"
+kind = "dis"
+flavor = "emu"
+arch = "x86_64"
+os = "linux 6.8.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the smallest loop there is, so the cost of one iteration can be counted in instructions"
+needed_by = ["m21"]
+bytes = 1000
+sha256 = "e7a5e82f2ac247558f11f1e81b8c75fafbd6fb99d99c3f5e60a5baad0bb9e652"
+
+[[artefact]]
 path = "traces/one-spinner.tape.gz"
 produced_by = "./bxtrace/record.escript one-spinner"
 kind = "reds"

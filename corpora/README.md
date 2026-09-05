@@ -59,6 +59,38 @@ corpora/
 
 Recorded output is evidence, so it is treated like evidence. If you cannot say which build produced a file, it does not go in.
 
+## The disassembly tapes
+
+Two of them, under `dis/`, and they are the reason this directory exists at all.
+
+`erts_debug:disassemble/1` prints what the loader left in memory: the opcode it chose for each instruction, the operands inline after it, and how many bytes the whole thing takes. On a stock release it prints nothing, because the whole function is inside `#ifndef BEAMASM` and the JIT half of it returns false at `erts/emulator/beam/beam_debug.c:512@OTP-29.0.5`. So `erts_debug:df/1` on a machine you installed with a package manager opens a file, writes nothing to it and reports `ok`.
+
+Read one with `just dis`, which does not need a runtime of any kind.
+
+```
+python3 -m tools.dis corpora/dis/l1.tape.gz
+```
+
+What comes out is a memory layout rather than an assembly listing. Each instruction has an offset inside its function, a size in bytes, and the same size in machine words, because the word count is the finding. The first word of an instruction holds the address of the C code that runs it and everything after it is operands sitting inline, so a three word instruction is one dispatch and two operands, and `return` is one word and nothing else.
+
+The other finding is in the names. `add(A, B) -> A + B` compiles to `gc_bif2` and arrives in memory as `i_plus_xxjd`, where the suffix is the loader saying it has already worked out that both operands are x registers and the result goes in one. The accumulator loop in `fib/3` arrives as `i_increment_rWd` and `swap_xx`, neither of which the compiler has ever heard of.
+
+### Recording them again
+
+You need an OTP built with `--disable-jit`, and the recorder refuses on anything else rather than writing an empty tape. A configure line with the optional applications turned off builds in around twenty five minutes on eight cores.
+
+```
+./configure --prefix=... --disable-jit --without-wx --without-javac --without-odbc
+make -j8 && make install
+```
+
+A build that small has no crypto, so the recorder cannot work out a sha256 for the manifest entry. Copy the tape onto an ordinary machine and print the entry there instead, which works because every field in it is read out of the tape rather than asked of the machine printing it.
+
+```
+./bxtrace/record.escript --by you l1-dis    on the interpreter build
+./bxtrace/record.escript --entry l1-dis     anywhere, once the tape is in place
+```
+
 ## The crash dump specimens
 
 Fourteen of them, under `dumps/`. Reading a dump is a skill and a skill needs examples, so each one is a node made to die in a particular way.

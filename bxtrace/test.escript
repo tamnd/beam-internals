@@ -79,9 +79,12 @@ temp_dir() ->
 
 run(Modules) ->
     Results = [run_module(M) || M <- Modules],
-    Failed = lists:sum([F || {_, F} <- Results]),
-    Total = lists:sum([T || {T, _} <- Results]),
-    io:format("~n~b cases, ~b passed, ~b failed~n", [Total, Total - Failed, Failed]),
+    Failed = lists:sum([F || {_, F, _} <- Results]),
+    Skipped = lists:sum([S || {_, _, S} <- Results]),
+    Total = lists:sum([T || {T, _, _} <- Results]),
+    io:format("~n~b cases, ~b passed, ~b failed, ~b skipped~n", [
+        Total, Total - Failed - Skipped, Failed, Skipped
+    ]),
     case Failed of
         0 -> 0;
         _ -> 1
@@ -90,21 +93,34 @@ run(Modules) ->
 run_module(Module) ->
     io:format("~s~n", [Module]),
     Cases = Module:cases(),
-    Failures = lists:foldl(fun(Case, Acc) -> Acc + run_case(Case) end, 0, Cases),
+    {Failures, Skips} = lists:foldl(
+        fun(Case, {F, S}) ->
+            case run_case(Case) of
+                fail -> {F + 1, S};
+                skip -> {F, S + 1};
+                pass -> {F, S}
+            end
+        end,
+        {0, 0},
+        Cases
+    ),
     io:nl(),
-    {length(Cases), Failures}.
+    {length(Cases), Failures, Skips}.
 
 run_case({Name, Fun}) ->
     try Fun() of
         _ ->
             io:format("  pass  ~ts~n", [Name]),
-            0
+            pass
     catch
+        throw:{ct_skipped, Why} ->
+            io:format("  skip  ~ts~n        ~ts~n", [Name, Why]),
+            skip;
         throw:{ct_failed, What, Detail} ->
             io:format("  FAIL  ~ts~n        ~ts~n        ~P~n", [Name, What, Detail, 12]),
-            1;
+            fail;
         Class:Reason:Stack ->
             io:format("  CRASH ~ts~n        ~p:~P~n", [Name, Class, Reason, 12]),
             [io:format("        ~P~n", [Frame, 8]) || Frame <- lists:sublist(Stack, 5)],
-            1
+            fail
     end.
