@@ -7,7 +7,7 @@ set shell := ["bash", "-uc"]
 # The full set, same order as ci.yml
 default: check
 
-check: prose ledger blueprints bpc-check citations site-check
+check: prose ledger blueprints bpc-check citations bake-offline site-check
     @echo "all checks passed"
 
 # House style. Catches the em dash, the banned words, sentences wrapped across
@@ -57,6 +57,24 @@ site-serve: site-stage
 
 site-build: site-stage
     mkdocs build --strict --config-file site/mkdocs.yml
+
+# Run every cell of every lesson the way Livebook runs them, and compare what
+# came out against the recordings in each lesson's `expected/`. Needs a release
+# on the path, same as `conformance`, so it is not part of `check`.
+bake *lessons:
+    python3 -m tools.bake {{ lessons }}
+
+# The same run, but the recordings are rewritten from it instead of compared
+# against. Read the diff before you commit it. A number that moved is either a
+# lesson that needs a new sentence or a release that changed underneath one.
+bake-write *lessons:
+    python3 -m tools.bake --write {{ lessons }}
+
+# The half that needs no Erlang, which is why it can live in `check`. Every
+# elixir cell is accounted for in meta.toml, every deterministic cell has a
+# recording, and the output printed inside the lesson matches that recording.
+bake-offline:
+    python3 -m tools.bake --offline
 
 # The conformance suites, against whatever release is on the path. Needs an
 # Erlang release and nothing else, which is the whole design of the runner. Not

@@ -52,6 +52,13 @@ jobs:
       - name: Citations resolve and match the pin
         run: python -m tools.refcheck
 
+      # The half of the baker that needs no Erlang. Every elixir cell is
+      # accounted for in its meta.toml, every deterministic cell has a
+      # recording, and the output printed inside a lesson is the recording
+      # rather than something that used to be true.
+      - name: Lesson cells and their recordings line up
+        run: python -m tools.bake --offline
+
   citations-deep:
     name: citations against the pinned OTP tree
     runs-on: ubuntu-latest

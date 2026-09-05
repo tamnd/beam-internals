@@ -85,7 +85,7 @@ Small programs, standard library only wherever possible, so they run in seconds 
 | `ledger` | Every claim has an entry, every entry has evidence of the class it declares, and the per lesson caps hold. |
 | `bpc` | Generates blueprint sections from the VM's own tables and fails the build if a generated section was hand edited. |
 | `bplint` | The nine sections, the field classifications, and the rule about not referencing the chapter. |
-| `bake` | Runs every cell of every lesson on a real build and writes `expected/`. |
+| `bake` | Runs every cell of every lesson the way Livebook runs them, and compares what came out against `expected/`. |
 | `drift` | Watches upstream and opens issues. Never edits content. |
 
 ## site

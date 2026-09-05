@@ -532,6 +532,8 @@ Once you have seen that subtraction, nil sitting between list and map stops bein
 Predict, then check. Predicting after you look does not count and you will know.
 
 Four terms. Work out the heap words for each from the rules above, without measuring first.
+<!-- cell: none, four terms to work out on paper -->
+
 
 ```elixir
 {:a, :b, :c}
