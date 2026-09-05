@@ -473,6 +473,8 @@ Two implementations, two different places to put the charge, and the same totals
 Predict, then check. Predicting after you look does not count and you will know.
 
 Here is a module you have not measured. Work out, from the rule alone, how many reductions each call costs per element of the list.
+<!-- cell: none, a listing to read before you measure it -->
+
 
 ```elixir
 defmodule Boss do

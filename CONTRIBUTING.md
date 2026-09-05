@@ -77,7 +77,9 @@ One lesson, one blueprint or one tool per pull request. Run `just check` first, 
 
 Two reviewers, and one of them has not written anything in that part of the curriculum. The outside reviewer is the one who catches assumed context, and assumed context is what makes internals writing unreadable to the people who need it most.
 
-If you changed a lesson cell, run `just bake` and commit the new expected output with a sentence saying why it changed. A changed output that nobody explains is a failing build on purpose.
+If you changed a lesson cell, run `just bake` to see what moved and `just bake-write` to record it, then commit the new expected output with a sentence saying why it changed. A changed output that nobody explains is a failing build on purpose.
+
+Every elixir block in a lesson needs a `<!-- cell: name -->` marker above it. Livebook runs every elixir block whether or not it is marked, so a block without one is a cell the baker cannot see and cannot check. If the block is there to be read rather than run, mark it `<!-- cell: none, and why -->` and the baker will leave it alone.
 
 ## Reporting something wrong
 
