@@ -4,6 +4,8 @@
 
 This project plans to host a public sandbox that runs Erlang typed by anonymous users, called the Node. That is the whole point of it and it is also the entire risk surface, so the controls are written down rather than assumed.
 
+Nothing is hosted today. The Node is on the bottom rung of its degradation ladder, which is rung 4 in `node/ladder.toml`, so every badge on every lesson links to the recorded corpus and there is no sandbox running anywhere. The scope below is what will be true when there is one, and it is published now because a sandbox whose controls were written after it went up is a sandbox nobody can review.
+
 In scope for a report here:
 
 - Anything that escapes the microVM sandbox, reaches the host, or reaches another session.
@@ -31,7 +33,7 @@ Include what you did, what happened, and what you expected. A reproduction that 
 
 Acknowledge within three working days. Give you an assessment and a plan within ten. Fix escape and egress issues before anything else in the backlog. Credit you in the advisory unless you would rather we did not.
 
-If the Node is affected, it goes to state 4 of the degradation ladder while the fix is prepared, which means the badge on every lesson becomes a link to the recorded corpus. Every lesson stays readable with all of its real output, so taking the sandbox down costs interactivity and does not cost information. That is why the ladder was designed before the sandbox was built.
+If the Node is affected, it goes to rung 4 of the degradation ladder in `node/ladder.toml` while the fix is prepared, which means the badge on every lesson becomes a link to the recorded corpus. Every lesson stays readable with all of its real output, so taking the sandbox down costs interactivity and does not cost information. That is why the ladder was designed before the sandbox was built.
 
 ## Design notes, for anyone reviewing the sandbox
 

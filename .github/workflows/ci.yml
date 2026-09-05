@@ -49,6 +49,13 @@ jobs:
       - name: Blueprint structure
         run: python -m tools.bplint
 
+      # The degradation ladder for the Node. Four rungs, each one worse than the
+      # one above it, and a bottom rung that needs nothing hosted. The badge on
+      # every lesson page is generated from this, so a broken ladder is a broken
+      # button on every page rather than a stale paragraph.
+      - name: The Node ladder
+        run: python -m tools.node --check
+
       - name: Citations resolve and match the pin
         run: python -m tools.refcheck
 

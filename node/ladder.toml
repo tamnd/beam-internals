@@ -1,0 +1,92 @@
+# The degradation ladder for the Node, and which rung the Node is standing on
+# right now.
+#
+# The Node is the hosted sandbox that a badge opens. It is the one part of this
+# project that costs real money every month, and it is the one part that can be
+# down for reasons that have nothing to do with the BEAM. So the way it gets
+# worse is designed here rather than improvised during an incident, and the
+# badge on every lesson page is generated from this file rather than written by
+# hand.
+#
+# Four rungs. Each one takes something away from the reader and the last one
+# takes away everything except the recorded output, which is the whole reason
+# the corpus was built before the sandbox. A version of this book with no Node
+# at all is still a complete book, and this file is where that claim is either
+# true or caught.
+#
+# tools/node.py reads this, checks it, and renders the badge that sitebuild
+# staples to the top of every lesson page. Run `just node` to see the ladder and
+# the badge for each rung.
+
+# Where a session lives when there is one. Nothing resolves this today, which is
+# the honest state of things, and rung 4 does not use it.
+node_url = "https://node.beam-internals.dev"
+
+# Where the badge sends a reader when there is no session to open. This is a
+# page on the book site itself, so it works whether or not anything is hosted.
+corpus_page = "corpus.md"
+
+[current]
+rung = 4
+since = "2026-09-06"
+# Written in full, because a rung with no reason attached is a rung nobody can
+# argue with later.
+why = """
+There is no host. Firecracker needs KVM on bare metal, none of the machines
+this project can reach exposes /dev/kvm, and the two bare metal hosts the plan
+budgets for are 250 dollars a month that nobody has agreed to spend. Rung 4 is
+where the Node stands until that changes, and the milestone that designed this
+ladder said in advance that the project survives here.
+"""
+
+[[rung]]
+number = 1
+name = "normal"
+title = "The Node is open"
+badge = "Open this lesson in the Node"
+target = "node"
+tone = "success"
+session_minutes = 10
+extensions = 1
+note = "A real OTP 29.0.5 release in a sandbox of your own. No account, nothing to install, and it goes away when you close the tab."
+entered_when = "The pool has a free microVM and the month is inside budget."
+costs_the_reader = "Nothing."
+
+[[rung]]
+number = 2
+name = "queued"
+title = "The Node is busy"
+badge = "Wait for a Node"
+target = "node"
+tone = "info"
+session_minutes = 10
+extensions = 1
+note = "Every sandbox is busy. The badge shows your position and an estimate, and the session is the same one you would have got straight away."
+entered_when = "Every microVM in the pool is taken and the queue is shorter than its ceiling."
+costs_the_reader = "Time before the session starts, and nothing about the session itself."
+
+[[rung]]
+number = 3
+name = "throttled"
+title = "The Node is on short sessions"
+badge = "Open a short Node session"
+target = "node"
+tone = "warning"
+session_minutes = 5
+extensions = 0
+note = "The month is running hot, so sessions are half as long and there are half as many at once. Everything inside the session is the same."
+entered_when = "The budget circuit breaker has fired, which happens on spend rather than on load."
+costs_the_reader = "Five minutes instead of ten, no extension, and a longer wait."
+
+[[rung]]
+number = 4
+name = "off"
+title = "The Node is off"
+badge = "Read the recorded output instead"
+target = "corpus"
+tone = "info"
+session_minutes = 0
+extensions = 0
+note = "There is no sandbox to open. Every cell on this page still shows what it printed when it was last run against OTP 29.0.5, and every recording behind those numbers is committed."
+entered_when = "There is no host, or the sandbox is being fixed, or the money ran out."
+costs_the_reader = "Interactivity, and nothing else. No lesson loses a number, a figure or an answer."

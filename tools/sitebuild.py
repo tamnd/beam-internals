@@ -14,12 +14,19 @@ import shutil
 import sys
 from pathlib import Path
 
+from tools import node
+
 SITE = Path("site")
 DOCS = SITE / "docs"
 
+# `corpus.md` is here because the bottom rung of the degradation ladder points
+# at it. A badge that sends a reader to a page the site does not publish is the
+# failure the ladder exists to prevent, so the page is staged whether or not the
+# Node is up.
 TOP = [
     ("index.md", Path("README.md"), "Home"),
     ("layout.md", Path("LAYOUT.md"), "Layout"),
+    ("corpus.md", Path("corpora/README.md"), "Corpus"),
     ("contributing.md", Path("CONTRIBUTING.md"), "Contributing"),
     ("notation.md", Path("blueprints/NOTATION.md"), "Blueprint notation"),
 ]
@@ -48,6 +55,24 @@ def stage_assets(lesson: Path, target: Path) -> None:
     shutil.copytree(source, target / "files", dirs_exist_ok=True)
 
 
+def with_badge(text: str, lesson: str, ladder: node.Ladder) -> str:
+    """The lesson page, with the Node badge under its title.
+
+    The badge is added here rather than written into `lesson.livemd`, because
+    the notebook has to open in Livebook Desktop with no site and no repository
+    anywhere near it. A button pointing at a hosted sandbox means nothing there.
+    The staged page is the copy that gets a badge, and it gets whichever badge
+    the ladder is standing on today.
+    """
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("# "):
+            head = lines[: index + 1]
+            tail = lines[index + 1 :]
+            return "\n".join([*head, "", node.badge(ladder, lesson).rstrip("\n"), *tail]) + "\n"
+    raise node.Broken(f"{lesson} has no title line, so there is nowhere to put the badge")
+
+
 def navigation(lessons: list[Path], blueprints: list[Path]) -> str:
     lines = ["", "nav:"]
     for name, _, title in TOP:
@@ -69,13 +94,17 @@ def navigation(lessons: list[Path], blueprints: list[Path]) -> str:
 def build(check: bool) -> int:
     lessons, blueprints = collect()
     config = (SITE / "mkdocs.base.yml").read_text(encoding="utf-8") + navigation(lessons, blueprints)
+    ladder = node.read()
 
     target = SITE / "mkdocs.yml"
     if check:
         if not target.exists() or target.read_text(encoding="utf-8") != config:
             print("sitebuild: navigation is out of date, run `just site-stage`")
             return 1
-        print(f"sitebuild: {len(lessons)} lessons, {len(blueprints)} blueprints, up to date")
+        print(
+            f"sitebuild: {len(lessons)} lessons, {len(blueprints)} blueprints, "
+            f"badge on rung {ladder.standing_on}, up to date"
+        )
         return 0
 
     DOCS.mkdir(parents=True, exist_ok=True)
@@ -88,7 +117,8 @@ def build(check: bool) -> int:
         for path in lessons:
             page = out / path.parent.name
             page.mkdir(exist_ok=True)
-            shutil.copyfile(path, page / "index.md")
+            text = path.read_text(encoding="utf-8")
+            (page / "index.md").write_text(with_badge(text, path.parent.name, ladder), encoding="utf-8")
             stage_assets(path.parent, page)
 
     if blueprints:
@@ -98,7 +128,10 @@ def build(check: bool) -> int:
             shutil.copyfile(path, out / f"{path.stem}.md")
 
     target.write_text(config, encoding="utf-8")
-    print(f"sitebuild: staged {len(TOP)} pages, {len(lessons)} lessons, {len(blueprints)} blueprints")
+    print(
+        f"sitebuild: staged {len(TOP)} pages, {len(lessons)} lessons, {len(blueprints)} blueprints, "
+        f"badge on rung {ladder.standing_on}, {ladder.current.name}"
+    )
     return 0
 
 
