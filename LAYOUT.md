@@ -82,6 +82,7 @@ The tape recorders, and the format they record into.
 bxtrace/
   src/bxtrace_tape.erl   the format, one reader and one writer
   src/bxtrace_reds.erl   the reduction tape, every scheduling event of a run
+  src/bxtrace_pass.erl   the pass tape, what the compiler did to a module
   test/                  the tests, run by test.escript
   test.escript           our own code, needs a release and nothing else
   tape.escript           what is on a tape, without drawing any of it
