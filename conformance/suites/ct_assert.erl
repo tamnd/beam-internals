@@ -9,9 +9,21 @@
 %% failure report is the only part of a test suite most people ever read.
 -module(ct_assert).
 
--export([eq/3, neq/3, is_true/2, raises/4, tag/1, wire/1, wire/2, words/1, fail/2]).
+-export([eq/3, neq/3, is_true/2, raises/4, tag/1, wire/1, wire/2, words/1, fail/2, skip/1]).
 
 -define(FAILED(What, Detail), throw({ct_failed, What, Detail})).
+
+%% A case that cannot run here, with the reason, reported as a skip rather than
+%% counted as a pass.
+%%
+%% There is one thing this is for and it should stay that way. A disassembly
+%% tape can only be recorded on an emulator built `--disable-jit', and a stock
+%% release is the JIT, so the cases that read one have nothing to read on most
+%% machines. Passing them would be a lie and failing them would make a green
+%% build impossible on a laptop, so the runner prints them as skipped with the
+%% reason next to them and puts the count in the summary. A skip you cannot see
+%% is the same as no test at all, which is why the reason is not optional.
+skip(Why) -> throw({ct_skipped, Why}).
 
 %% Equality is `=:=' and never `=='. The two differ on 1 and 1.0, which is
 %% exactly the pair a term format has to keep apart.

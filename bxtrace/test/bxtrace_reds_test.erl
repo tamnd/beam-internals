@@ -4,8 +4,9 @@
 %% would use to check it. The way out is a workload whose reduction count can be
 %% worked out on paper: a tail recursive loop of N iterations costs N reductions
 %% and nothing else. If the tape says something far from N then the tape is
-%% wrong, and if it says something a little over N then the difference is the
-%% call into the loop and the read that follows it, which is a handful.
+%% wrong, and if it says something within a handful of N then the difference is
+%% the call into the loop, the read that follows it, and which flavor of
+%% emulator is running, all of which are worked out in what_it_cost/0 below.
 -module(bxtrace_reds_test).
 
 -export([cases/0]).
@@ -16,6 +17,12 @@
 
 %% The loop the cost claims are made about.
 -define(SPIN, 200000).
+
+%% The default scheduler slice, and the floor the cost has to clear. The
+%% interpreter charges one reduction less per slice than the JIT does, so a loop
+%% this long comes out about fifty short there. See what_it_cost/0 below.
+-define(SLICE, 4000).
+-define(FLOOR, ?SPIN - (?SPIN div ?SLICE) - 10).
 
 cases() ->
     [
@@ -139,14 +146,27 @@ timeline() ->
 %% thousand and one reductions, one per call including the call that hits the
 %% base clause. Around it sit the fun the recorder was handed, the call into
 %% this module, and the process_info read that collects the number, and those
-%% are small and countable rather than noise. The band below is wide enough to
-%% survive a compiler that inlines one of them and narrow enough that a recorder
-%% reading the wrong process would fail it by two orders of magnitude.
+%% are small and countable rather than noise.
+%%
+%% The floor sits a little under the iteration count, and that gap is a real
+%% difference between the two flavors rather than slack. Under the JIT this loop
+%% costs 200003, the same number on every run of every machine here. Under an
+%% emulator built `--disable-jit' it costs 199955, and the shortfall is not
+%% noise either: it grows by exactly one for every four thousand iterations,
+%% which is the default slice, so the interpreter is charging one reduction less
+%% each time the loop is scheduled out and back in. Measured at four thousand,
+%% fifty thousand, two hundred thousand, four hundred thousand and eight hundred
+%% thousand iterations, where the difference from the iteration count ran +4, -7,
+%% -45, -95 and -195.
+%%
+%% So the floor allows one lost reduction per slice and a handful either way,
+%% which is still narrow enough that a recorder reading the wrong process fails
+%% it by two orders of magnitude.
 what_it_cost() ->
     one_spinner("cost", #{}, fun(_Header, Events, Result) ->
         Spent = spent(Events),
         ?EQ("what the tape says and what the recorder returned", Spent, maps:get(spent, Result)),
-        ct_assert:is_true("the loop cost at least what its iterations cost", Spent >= ?SPIN),
+        ct_assert:is_true("the loop cost about what its iterations cost", Spent >= ?FLOOR),
         ct_assert:is_true("and barely more than that", Spent =< ?SPIN + 100)
     end).
 

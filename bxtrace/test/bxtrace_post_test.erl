@@ -9,6 +9,9 @@
 -module(bxtrace_post_test).
 
 -export([cases/0]).
+%% The specimen suite records postmortem tapes too, so it shares the gate below
+%% rather than keeping a second copy of it.
+-export([needs_a_digest/0]).
 
 -define(EQ(What, Expected, Actual), ct_assert:eq(What, Expected, Actual)).
 
@@ -75,7 +78,25 @@ write_specimen(Path) ->
 tape_path(Name) ->
     filename:join(scratch(), io_lib:format("bxtrace-post-~ts-~b.tape.gz", [Name, erlang:unique_integer([positive])])).
 
+%% Every case that records a tape goes through here, so this is the one place
+%% the digest has to be available. A build configured `--without-ssl' has no
+%% crypto and the recorder refuses on it, which is correct behaviour and not
+%% something to fail the suite over, so it is reported as a skip with the reason
+%% and counted in the summary. The interpreter build the disassembly tapes come
+%% from is exactly such a build, so this is met in practice rather than in
+%% theory.
+%% The recorder's own refusal is reused rather than restated, so there is one
+%% description of what is missing and the skip reason cannot drift away from the
+%% error a person recording by hand would see.
+needs_a_digest() ->
+    try bxtrace_post:digest_check() of
+        ok -> ok
+    catch
+        error:{bxtrace_post, Why} -> ct_assert:skip(Why)
+    end.
+
 record(Name, Dump, Fun) ->
+    ok = needs_a_digest(),
     Path = tape_path(Name),
     {ok, Result} = bxtrace_post:record(Path, #{
         by_whom => "tamnd", why => "the postmortem tape tests", dump => Dump
@@ -260,6 +281,7 @@ cut(Path, Lines) ->
     Cut.
 
 not_a_dump() ->
+    ok = needs_a_digest(),
     Path = filename:join(scratch(), io_lib:format("bxtrace-post-junk-~b.txt", [erlang:unique_integer([positive])])),
     ok = file:write_file(Path, <<"this is a log file\nand it has no sections in it\n">>),
     try

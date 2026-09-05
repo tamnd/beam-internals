@@ -165,6 +165,7 @@ dump() ->
 %% right.
 
 records() ->
+    ok = bxtrace_post_test:needs_a_digest(),
     {ok, Spec} = bxtrace_specimen:find("halt-slogan"),
     Path = temp("halt") ++ ".tape.gz",
     try
@@ -180,6 +181,7 @@ records() ->
     end.
 
 records_truncated() ->
+    ok = bxtrace_post_test:needs_a_digest(),
     {ok, Spec} = bxtrace_specimen:find("truncated"),
     Path = temp("truncated") ++ ".tape.gz",
     try

@@ -19,6 +19,7 @@
 %%   ./bxtrace/record.escript l1-passes
 %%   ./bxtrace/record.escript --dumps
 %%   ./bxtrace/record.escript --all
+%%   ./bxtrace/record.escript --entry l1-dis
 
 -mode(compile).
 
@@ -27,14 +28,15 @@ main(Args) ->
     Out = build(Root),
     case who(Args) of
         {_, ["--list"]} -> list();
-        {By, ["--all"]} -> run(Root, Out, By, [Name || {Name, _} <- recordings()]);
-        {By, ["--dumps"]} -> run(Root, Out, By, [Name || {Name, _} <- specimens()]);
+        {_, ["--entry" | Names]} -> entries(Root, Names);
+        {By, ["--all"]} -> run_what_it_can(Root, Out, By, recordings());
+        {By, ["--dumps"]} -> run_what_it_can(Root, Out, By, specimens());
         {_, []} -> usage();
         {By, Names} -> run(Root, Out, By, Names)
     end.
 
 usage() ->
-    io:format("usage: record.escript [--by NAME] [--list | --all | --dumps | NAME ...]~n"),
+    io:format("usage: record.escript [--by NAME] [--list | --all | --dumps | --entry NAME ... | NAME ...]~n"),
     halt(2).
 
 %% Who is recording this. It defaults to whoever is logged in, which is right
@@ -50,8 +52,17 @@ default_by_whom() ->
     end.
 
 list() ->
-    [io:format("~-26s  ~ts~n", [Name, maps:get(why, Spec)]) || {Name, Spec} <- recordings()],
+    [io:format("~-26s  ~ts~ts~n", [Name, note(Spec), maps:get(why, Spec)]) || {Name, Spec} <- recordings()],
     halt(0).
+
+%% A recording that needs a particular build says so in the listing, so that
+%% somebody deciding what to re record can see it before running it rather than
+%% after.
+note(Spec) ->
+    case maps:get(needs, Spec, any) of
+        any -> "";
+        Flavor -> io_lib:format("[needs the ~w flavor] ", [Flavor])
+    end.
 
 %% ---------------------------------------------------------------------------
 %% What there is to record
@@ -96,6 +107,43 @@ fixed() ->
                 })
             end
         }},
+        %% The two disassembly tapes. Both need an emulator configured
+        %% `--disable-jit', because `erts_debug:disassemble/1' is one line
+        %% returning false on the JIT, so neither of these can be re-recorded on
+        %% a release you installed with a package manager. The recorder says so
+        %% rather than writing an empty tape.
+        {"l1-dis", #{
+            path => "dis/l1.tape.gz",
+            kind => dis,
+            needs => emu,
+            why => "the opcodes the loader chose for a six line module, none of which the compiler emitted",
+            needed_by => ["m21"],
+            record => fun(Root, By, Path) ->
+                bxtrace_dis:record(Path, #{
+                    by_whom => By,
+                    why =>
+                        "the opcodes the loader chose for a six line module, none of which the "
+                        "compiler emitted",
+                    source => filename:join([Root, "corpora", "src", "l1.erl"])
+                })
+            end
+        }},
+        {"spinner-dis", #{
+            path => "dis/spinner.tape.gz",
+            kind => dis,
+            needs => emu,
+            why => "the smallest loop there is, so the cost of one iteration can be counted in instructions",
+            needed_by => ["m21"],
+            record => fun(Root, By, Path) ->
+                bxtrace_dis:record(Path, #{
+                    by_whom => By,
+                    why =>
+                        "the smallest loop there is, so the cost of one iteration can be counted "
+                        "in instructions",
+                    source => filename:join([Root, "corpora", "src", "spinner.erl"])
+                })
+            end
+        }},
         {"one-spinner", #{
             path => "traces/one-spinner.tape.gz",
             kind => reds,
@@ -120,6 +168,29 @@ run(Root, _Out, By, Names) ->
     [one(Root, By, Name, Spec) || {Name, Spec} <- Specs],
     halt(0).
 
+run_what_it_can(Root, Out, By, Specs) ->
+    lists:foreach(
+        fun({Name, Spec}) ->
+            io:format("%% skipped ~ts: this emulator is the ~w flavor and that tape needs ~w~n", [
+                Name, erlang:system_info(emu_flavor), maps:get(needs, Spec)
+            ])
+        end,
+        [Pair || {_, Spec} = Pair <- Specs, skip(Spec)]
+    ),
+    run(Root, Out, By, [Name || {Name, Spec} <- Specs, not skip(Spec)]).
+
+%% Some recordings only work on an emulator built a particular way, and the
+%% flavor is the one that comes up so far: a disassembly tape needs the
+%% interpreter, and a stock release is the JIT. Asked for by name it refuses,
+%% because somebody typed that name and wants the tape. Reached through `--all'
+%% it says what it skipped and carries on, because `--all' on a laptop should
+%% re record everything a laptop can and then tell you what it could not.
+skip(Spec) ->
+    case maps:get(needs, Spec, any) of
+        any -> false;
+        Flavor -> erlang:system_info(emu_flavor) =/= Flavor
+    end.
+
 spec(Name) ->
     case lists:keyfind(Name, 1, recordings()) of
         {_, Spec} ->
@@ -134,31 +205,62 @@ one(Root, By, Name, Spec) ->
     Path = filename:join([Root, "corpora", maps:get(path, Spec)]),
     Record = maps:get(record, Spec),
     {ok, Result} = Record(Root, By, Path),
-    io:format("~ts~n", [manifest(Name, By, Spec, Path)]),
+    entry(Root, Name),
     io:format("%% ~ts: ~p~n~n", [Name, maps:remove(path, Result)]).
+
+%% The entry for a tape that is already recorded, without recording it again.
+%%
+%% This exists because the machine that can make a tape is not always the
+%% machine that can describe it. The disassembly tapes come off an OTP built
+%% `--disable-jit', and a build like that is configured with as little as
+%% possible in it, so it has no crypto and cannot work out a sha256. Copy the
+%% tape somewhere ordinary and run this, and the entry comes out the same,
+%% because every field in it is read from the tape rather than from the machine
+%% printing it.
+entries(_Root, []) ->
+    io:format("usage: record.escript --entry NAME ...~n"),
+    halt(2);
+entries(Root, Names) ->
+    [entry(Root, Name) || Name <- Names],
+    halt(0).
+
+entry(Root, Name) ->
+    Spec = spec(Name),
+    Path = filename:join([Root, "corpora", maps:get(path, Spec)]),
+    io:format("~ts~n", [manifest(Name, Spec, Path)]).
 
 %% ---------------------------------------------------------------------------
 %% The manifest entry
 %%
-%% Everything here is asked of the machine rather than typed, except the two
-%% things a machine cannot answer: who ran it and what needs it. Those two are
-%% the difference between evidence and a file somebody found, and they are the
-%% only two fields in the entry that a person is trusted with.
+%% Every field is read out of the tape rather than asked of the machine running
+%% this, except the two things no machine can answer: what the tape is for and
+%% which lessons need it. Those two come from the recording's own entry above,
+%% where a person wrote them.
+%%
+%% Reading the tape rather than the machine is what makes the entry checkable.
+%% `python3 -m tools.corpus' compares the manifest against the tape header field
+%% by field, and if the entry were printed from the live VM those two would
+%% agree because they were both true at the same moment rather than because they
+%% describe the same file. Six months later, when somebody copies a tape into
+%% place and pastes an entry printed on their own laptop, only one of those two
+%% catches it.
 
-manifest(Name, By, Spec, Path) ->
+manifest(Name, Spec, Path) ->
     {ok, Bytes} = file:read_file(Path),
-    {_Family, OsName} = os:type(),
+    {ok, Header, _} = read_header(Path),
+    {_Family, OsName, OsVersion} = maps:get(os, Header),
+    said("kind", Name, atom_to_list(maps:get(kind, Spec)), atom_to_list(maps:get(kind, Header))),
     [
         io_lib:format("[[artefact]]~n", []),
         field("path", maps:get(path, Spec)),
         field("produced_by", "./bxtrace/record.escript " ++ Name),
-        field("kind", atom_to_list(maps:get(kind, Spec))),
-        field("flavor", atom_to_list(erlang:system_info(emu_flavor))),
-        field("arch", arch()),
-        field("os", lists:flatten(io_lib:format("~w ~ts", [OsName, os_version()]))),
-        field("build", atom_to_list(erlang:system_info(build_type))),
-        field("recorded", today()),
-        field("by_whom", By),
+        field("kind", atom_to_list(maps:get(kind, Header))),
+        field("flavor", atom_to_list(maps:get(flavor, Header))),
+        field("arch", arch(maps:get(arch, Header))),
+        field("os", lists:flatten(io_lib:format("~w ~ts", [OsName, OsVersion]))),
+        field("build", atom_to_list(maps:get(build, Header))),
+        field("recorded", day(maps:get(recorded, Header))),
+        field("by_whom", maps:get(by_whom, Header)),
         field("why", maps:get(why, Spec)),
         io_lib:format("needed_by = [~ts]~n", [
             lists:join(", ", [io_lib:format("\"~ts\"", [L]) || L <- maps:get(needed_by, Spec)])
@@ -167,23 +269,36 @@ manifest(Name, By, Spec, Path) ->
         field("sha256", binary_to_list(binary:encode_hex(crypto:hash(sha256, Bytes), lowercase)))
     ].
 
+%% Reading the whole tape to get at its first line is wasteful and it is also
+%% the only reader there is, and these are small. A tape that will not read is a
+%% tape with no entry, which is the right answer.
+read_header(Path) ->
+    case bxtrace_tape:fold(Path, fun(_, N) -> N + 1 end, 0) of
+        {ok, Header, Count} ->
+            {ok, Header, Count};
+        {error, Reason} ->
+            io:format("~ts will not read: ~p~n", [Path, Reason]),
+            halt(1)
+    end.
+
+said(Field, Name, Same, Same) ->
+    {Field, Name, Same};
+said(Field, Name, Spec, Tape) ->
+    io:format("~ts says its ~ts is ~ts and the tape says ~ts~n", [Name, Field, Spec, Tape]),
+    halt(1).
+
 field(Key, Value) -> io_lib:format("~ts = \"~ts\"~n", [Key, Value]).
 
 %% The manifest wants the instruction set on its own, because the JIT emits a
 %% different one on each and a tape that only said `aarch64-apple-darwin24.6.0'
 %% would need parsing by everything that reads it.
-arch() ->
-    hd(string:split(erlang:system_info(system_architecture), "-")).
+arch(Triple) ->
+    hd(string:split(Triple, "-")).
 
-os_version() ->
-    case os:version() of
-        {Major, Minor, Release} -> lists:flatten(io_lib:format("~b.~b.~b", [Major, Minor, Release]));
-        Text when is_list(Text) -> Text
-    end.
-
-today() ->
-    {{Year, Month, Day}, _} = calendar:universal_time(),
-    lists:flatten(io_lib:format("~4..0b-~2..0b-~2..0b", [Year, Month, Day])).
+%% The tape stamps the second it was recorded and the manifest holds the day,
+%% because a manifest is read by people and nobody needs the second.
+day(Timestamp) ->
+    hd(string:split(Timestamp, "T")).
 
 %% ---------------------------------------------------------------------------
 %% Building
