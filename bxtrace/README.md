@@ -23,6 +23,8 @@ corpora/traces/four-spinners.tape.gz
 
 Text, because a tape that can be diffed is a tape whose change between two releases can be read by a person. One term per line, because a tool that only wants the third event should not have to parse the first two hundred thousand. Gzipped, because a scheduling trace of one busy second is large and repetitive and these files are committed.
 
+Terms are written with `~0tp`, and the three parts of that all earn their place. The zero is the line width and means never wrap, because a term broken across four lines to fit in eighty columns breaks the one term per line rule everything else rests on. The `t` is unicode, so a binary holding text keeps its characters rather than turning into escapes. The `p` rather than `w` is the readability: `~w` writes `<<"29">>` as `<<50,57>>`, which parses back to exactly the same binary and tells a person nothing. Both survive the round trip, so the only thing that changes is whether the claim about being diffable by a person is actually true.
+
 The footer is the reason a truncated tape is caught rather than quietly read short. A recorder killed halfway through leaves a file that looks fine until somebody notices the run ended early, and a count at the end turns that into an error at the point of reading instead of a puzzle three weeks later.
 
 ## What may go on a tape
