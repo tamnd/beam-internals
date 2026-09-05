@@ -51,10 +51,36 @@ corpora/
   jdump/             +JDdump output, x86-64 and aarch64
   passes/            erlc +time, -S, +to_core, +dabstr for the four canonical programs
   chunks/            .beam files and their chunk dumps
-  dumps/             crash dump specimens, fourteen causes
+  dumps/             fourteen crash dump specimens, as postmortem tapes
   traces/            trace captures, msacc, instrument
   dist/              packet captures of a full distribution handshake
   tables/            genop.tab, ops.tab, bif.tab, atom.names snapshots
 ```
 
 Recorded output is evidence, so it is treated like evidence. If you cannot say which build produced a file, it does not go in.
+
+## The crash dump specimens
+
+Fourteen of them, under `dumps/`. Reading a dump is a skill and a skill needs examples, so each one is a node made to die in a particular way.
+
+Eight died of different causes. A deliberate halt with a string, a halt whose slogan is a formatted term, an uncaught exit before the node finished booting, a system process killed out from under the kernel, the atom table filling, the port table filling, a signal from an operator, and a dump cut off by a byte budget.
+
+Six died the same way with the node doing something different at the time. Two thousand processes alive, a dirty CPU scheduler in the middle of a job, one process holding a two million element list, fifty thousand messages queued for a process that is not reading them, five hundred ETS tables, and a node connected to another node. That second group is the one that shows which parts of a dump are about the cause of death and which parts are there every time.
+
+### What is kept is the tape, not the dump
+
+A stock dump is about 1.8 MB and most of that is heap and atom text that means nothing away from the machine it came from. Fourteen of those would be thirty megabytes of near identical hex in a repository of prose.
+
+So what is stored is the postmortem tape: every section, every fact, and every line of every section that is not a blob, with a digest and a line count standing in for the blobs. About a hundred kilobytes each, and it holds every fact a lesson would want to quote. The dump itself is reproducible, because the recipe is the recording.
+
+### The specimens check themselves
+
+Each one declares what it expects to find in its own dump: the slogan, whether the dump should be complete, which sections have to be there, how many of them, and any line that has to appear. The recorder checks the dump against that before it writes a tape.
+
+A slogan is not an API and a section list is not a promise, so one day a release will change one. When it does, the recording fails and names the specimen and what it saw. That is a much better morning than finding out from a lesson that quotes a dump which no longer exists.
+
+### One of them looks different on macOS
+
+The `dirty-scheduler` specimen has no dirty scheduler sections when it is recorded on a Mac. That is not a bug in the specimen. The emulator only walks the dirty schedulers for a dump if it can wrap the walk in its home made try catch built from signal handlers, and it does not do that on Apple platforms, so the whole block is compiled out. A macOS dump has ten `=scheduler` sections and not one dirty one.
+
+What survives everywhere is in the process section, where the process running the dirty job is `DIRTY_RUNNING` and its last scheduled call is the dirty BIF. That is what the specimen insists on, so it holds wherever it is recorded.

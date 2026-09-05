@@ -17,6 +17,7 @@
 %%
 %%   ./bxtrace/record.escript --list
 %%   ./bxtrace/record.escript l1-passes
+%%   ./bxtrace/record.escript --dumps
 %%   ./bxtrace/record.escript --all
 
 -mode(compile).
@@ -27,12 +28,13 @@ main(Args) ->
     case who(Args) of
         {_, ["--list"]} -> list();
         {By, ["--all"]} -> run(Root, Out, By, [Name || {Name, _} <- recordings()]);
+        {By, ["--dumps"]} -> run(Root, Out, By, [Name || {Name, _} <- specimens()]);
         {_, []} -> usage();
         {By, Names} -> run(Root, Out, By, Names)
     end.
 
 usage() ->
-    io:format("usage: record.escript [--by NAME] [--list | --all | NAME ...]~n"),
+    io:format("usage: record.escript [--by NAME] [--list | --all | --dumps | NAME ...]~n"),
     halt(2).
 
 %% Who is recording this. It defaults to whoever is logged in, which is right
@@ -48,7 +50,7 @@ default_by_whom() ->
     end.
 
 list() ->
-    [io:format("~-14s  ~ts~n", [Name, maps:get(why, Spec)]) || {Name, Spec} <- recordings()],
+    [io:format("~-26s  ~ts~n", [Name, maps:get(why, Spec)]) || {Name, Spec} <- recordings()],
     halt(0).
 
 %% ---------------------------------------------------------------------------
@@ -60,6 +62,25 @@ list() ->
 %% cheapest thing that still leaves the manifest able to be generated.
 
 recordings() ->
+    fixed() ++ specimens().
+
+%% The fourteen crash dump specimens. They are not written out one by one here
+%% because the recipe for each already lives in bxtrace_specimen, next to what
+%% the dump is expected to contain. This turns each of those into a recording
+%% with a name, which is what makes `produced_by' a command somebody can run.
+specimens() ->
+    [
+        {"dump-" ++ maps:get(name, Spec), #{
+            path => "dumps/" ++ maps:get(name, Spec) ++ ".tape.gz",
+            kind => postmortem,
+            why => maps:get(why, Spec),
+            needed_by => ["m62"],
+            record => fun(_Root, By, Path) -> bxtrace_specimen:record(Spec, Path, By) end
+        }}
+     || Spec <- bxtrace_specimen:all()
+    ].
+
+fixed() ->
     [
         {"l1-passes", #{
             path => "passes/l1.tape.gz",

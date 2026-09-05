@@ -23,7 +23,10 @@ from pathlib import Path
 
 CITATION = re.compile(
     r"\b((?:erts|lib|system|make)/[\w./+-]+\.(?:c|h|cpp|hpp|erl|hrl|tab|md|names|types|tla|pl))"
-    r":(\d+)(?:-(\d+))?@(OTP-[\w.]+)"
+    # The tag may not end on a dot. Without that a citation at the end of a
+    # sentence swallows the full stop and then reports itself as pinned to a
+    # release that does not exist.
+    r":(\d+)(?:-(\d+))?@(OTP-[\w.]*\w)"
 )
 
 # site/ holds copies that `sitebuild` staged, so counting it would double every
@@ -47,13 +50,17 @@ def load_config(root: Path) -> dict:
 
 
 def prose_files(root: Path) -> list[Path]:
-    """Every markdown file under root, including Livebook notebooks.
+    """Every file under root that is allowed to cite the tree.
 
     Lessons cite the tree more than anything else does, and a lesson is a
-    `.livemd`, so a checker that only reads `.md` would check the least of it.
+    `.livemd`, so a checker that only read `.md` would check the least of it.
+    Our own Erlang cites it too, for the same reason prose does: a comment
+    saying why the code does something odd is worth nothing if the reader
+    cannot go and look. A citation nobody checks is a citation that rots, and
+    where it lives makes no difference to that.
     """
     found: list[Path] = []
-    for pattern in ("*.md", "*.livemd"):
+    for pattern in ("*.md", "*.livemd", "*.erl", "*.hrl", "*.escript"):
         found.extend(root.rglob(pattern))
     return sorted(found)
 

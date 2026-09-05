@@ -69,3 +69,31 @@ def test_a_jit_citation_is_read(tmp_path: Path) -> None:
     found = cite(tmp_path, "See `erts/emulator/beam/jit/x86/instr_call.cpp:70@OTP-29.0.5`.\n")
     assert found[0].path == "erts/emulator/beam/jit/x86/instr_call.cpp"
     assert found[0].start == 70
+
+
+# A citation at the end of a sentence used to swallow the full stop, and then
+# report itself as pinned to OTP-29.0.5. rather than OTP-29.0.5. Nothing in the
+# tree happened to end a sentence that way until our own Erlang started citing
+# it, which is exactly how a pattern bug stays hidden.
+def test_a_citation_at_the_end_of_a_sentence_keeps_the_tag_clean(tmp_path: Path) -> None:
+    found = cite(tmp_path, "The block is at erts/emulator/beam/erl_crash_dump.c:616@OTP-29.0.5.\n")
+    assert found[0].tag == "OTP-29.0.5"
+    assert found[0].path == "erts/emulator/beam/erl_crash_dump.c"
+
+
+# Our own Erlang cites the tree in its comments, for the same reason prose does.
+# A citation nobody checks is a citation that rots.
+def test_erlang_sources_are_collected(tmp_path: Path) -> None:
+    (tmp_path / "mod.erl").write_text(
+        "%% The condition is at erts/emulator/sys/unix/erl_unix_sys.h:406@OTP-29.0.5.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "run.escript").write_text(
+        "%% And the block at erts/emulator/beam/erl_crash_dump.c:616@OTP-29.0.5.\n",
+        encoding="utf-8",
+    )
+    found = refcheck.collect([tmp_path])
+    assert sorted(c.path for c in found) == [
+        "erts/emulator/beam/erl_crash_dump.c",
+        "erts/emulator/sys/unix/erl_unix_sys.h",
+    ]

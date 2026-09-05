@@ -155,10 +155,10 @@ A stage's text goes on the tape as one binary, so a two hundred line listing is 
 `bxtrace_post:record/2` reads a crash dump and writes the index that makes it navigable.
 
 ```erlang
-{ok, Result} = bxtrace_post:record("corpora/dumps/out-of-memory.tape.gz",
+{ok, Result} = bxtrace_post:record("corpora/dumps/halt-slogan.tape.gz",
                                    #{by_whom => "tamnd",
-                                     why     => "the fourteen causes figure",
-                                     dump    => "corpora/dumps/out-of-memory.dump"}).
+                                     why     => "the simplest dump there is",
+                                     dump    => "/tmp/halt-slogan.dump"}).
 ```
 
 The dump this was written against is 1.78 MB, 58735 lines and 1167 sections. The honest description of reading one in a text editor is that you scroll until you give up. The tape is 100 KB and 18044 rows: one row naming each section, 16711 facts, 118 summaries of encoded memory, and 48 lines that are not facts.
@@ -176,7 +176,7 @@ The dump this was written against is 1.78 MB, 58735 lines and 1167 sections. The
 
 A section is `{section, At, Kind, Id, Line, Lines}`. `At` numbers the sections in file order and everything under a section points back at it, and `Line` is where that section starts in the dump, so a reader who wants the raw text knows where to look. The two are separate on purpose: one orders the tape and the other addresses the file.
 
-The tape is an index and not a replacement. The dump stays in `corpora/dumps` and the tape points into it.
+The tape is an index, and `Line` on every row is what makes it an index of something rather than a summary of it. Anybody holding the dump can go straight to the line the row came from.
 
 ### Facts and blobs
 
@@ -207,6 +207,29 @@ The recorder reads it anyway and says so in the header as `complete => false`. M
 The header has two halves. The usual fields describe the machine that read the dump. A `dumped` map holds what the dump says about the node that wrote it: the format version, the time, the slogan, the system version, the atom count and which thread was running.
 
 Keeping them apart matters because a dump copied off another machine is the normal case rather than the odd one. Merging the two would produce a tape claiming a dead node's heap was measured in the reading node's word size.
+
+### The fourteen specimens
+
+A recorder for crash dumps is not much use without crash dumps, so `bxtrace_specimen` holds fourteen recipes, each one a child node made to die in a particular way. Eight of them die of different causes and six die the same way with the node in a different state. `corpora/README.md` lists them.
+
+Each recipe carries what it expects the dump to contain, and the recorder checks the dump against that before it writes a tape.
+
+```erlang
+#{name => "port-table-full",
+  why => "the port table filled, so the dump has a full port table to read",
+  flags => ["+Q", "1024"],
+  eval => "...",
+  expect => #{slogan_starts => <<"Runtime terminating during boot ({system_limit,">>,
+              complete => true,
+              kinds => [erl_crash_dump, port],
+              at_least => #{port => 500}}}
+```
+
+Five things can be asserted: the slogan exactly or by prefix, whether the dump should end with `=end`, which section kinds have to be present, how many of a kind there have to be, and any line that has to appear somewhere in the file. The last one exists because some of what makes a specimen the specimen is not a section, it is a flag on a process.
+
+A slogan is not an API and a section list is not a promise, so a release will change one eventually. When it does, the recording stops and names the specimen and what it actually saw, which beats finding out from a lesson quoting a dump that no longer exists.
+
+The `at_least` figures are deliberately loose. Asking a node for 1024 ports and getting 859 into the dump is not a bug, it is the emulator keeping slots for itself, and a floor of 500 proves the table filled without pinning a number that was never the point.
 
 ## Reading one
 
