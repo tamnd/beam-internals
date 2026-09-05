@@ -110,7 +110,14 @@ IO.puts("                     bytes words bytes")
 for {label, term} <- terms do
   bytes = :erlang.term_to_binary(term)
   <<131, tag, _rest::binary>> = bytes
-  words = :erts_debug.flat_size(term)
+
+  # Measured after a round trip, on purpose. The heap cost that matters for a
+  # format about sending things is what the term costs the node that receives
+  # it, which is the term the decoder built and not the one sitting in this
+  # cell. It also keeps the column honest: a binary typed into a notebook cell
+  # is stored off heap by the evaluator and reads as eight words whatever its
+  # length, which says something about Livebook and nothing about the wire.
+  words = :erts_debug.flat_size(:erlang.binary_to_term(bytes))
 
   IO.puts(
     String.pad_trailing(label, 20) <>
