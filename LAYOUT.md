@@ -62,7 +62,7 @@ corpora/
   jdump/             +JDdump output, x86-64 and aarch64
   passes/            erlc +time, -S, +to_core, +dabstr for the four canonical programs
   chunks/            .beam files and their chunk dumps
-  dumps/             crash dump specimens, fourteen causes
+  dumps/             fourteen crash dump specimens, as postmortem tapes
   traces/            trace captures, msacc, instrument
   dist/              packet captures of a full distribution handshake
   tables/            genop.tab, ops.tab, bif.tab, atom.names snapshots
@@ -84,6 +84,7 @@ bxtrace/
   src/bxtrace_reds.erl   the reduction tape, every scheduling event of a run
   src/bxtrace_pass.erl   the pass tape, what the compiler did to a module
   src/bxtrace_post.erl   the postmortem tape, a crash dump turned into an index
+  src/bxtrace_specimen.erl  the fourteen crash dumps, and how each one is produced
   test/                  the tests, run by test.escript
   test.escript           our own code, needs a release and nothing else
   tape.escript           what is on a tape, without drawing any of it

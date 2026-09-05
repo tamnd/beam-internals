@@ -69,6 +69,228 @@ needed_by = ["t07"]
 bytes = 1135
 sha256 = "ee9f9c218eb441780ffc91ba1a284ec558e2b1126b42d13056cc3d65f00eeccb"
 
+# The fourteen crash dump specimens. Eight of them died of different causes and
+# six died the same way with the node in a different state, which is what shows
+# which parts of a dump are about the cause of death and which parts are there
+# every time. The recipe for each one lives in bxtrace/src/bxtrace_specimen.erl
+# next to what the dump is expected to contain, and the recording fails rather
+# than writing a tape if a specimen stops producing what it claims.
+#
+# What is kept is the tape, not the dump. A stock dump is about 1.8 MB and most
+# of that is heap and atom text that means nothing away from the machine it came
+# from. Fourteen of those would be thirty megabytes of near identical hex in a
+# repository of prose.
+
+[[artefact]]
+path = "dumps/halt-slogan.tape.gz"
+produced_by = "./bxtrace/record.escript dump-halt-slogan"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the simplest dump there is, a deliberate halt with a string"
+needed_by = ["m62"]
+bytes = 100121
+sha256 = "a629f18ef26c508363b1f91ec4f5803689aed86f75a73b0f5dea84478811f1a9"
+
+[[artefact]]
+path = "dumps/halt-term.tape.gz"
+produced_by = "./bxtrace/record.escript dump-halt-term"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt whose slogan is a formatted term rather than a sentence"
+needed_by = ["m62"]
+bytes = 101334
+sha256 = "a311ba86f25a83bd3044a3345088b5efcdd0a4664f985e9306f49c44cc28f17d"
+
+[[artefact]]
+path = "dumps/boot-exit.tape.gz"
+produced_by = "./bxtrace/record.escript dump-boot-exit"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "an uncaught exit before the node finished starting"
+needed_by = ["m62"]
+bytes = 99657
+sha256 = "a05486728f0172e604999705604b487497ae01a5f6cd5a37b5c4d7446cfe59b1"
+
+[[artefact]]
+path = "dumps/kernel-pid-terminated.tape.gz"
+produced_by = "./bxtrace/record.escript dump-kernel-pid-terminated"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a system process killed, which the kernel does not survive"
+needed_by = ["m62"]
+bytes = 89164
+sha256 = "829953bc1b17fa855a748958b73fcc3753f2057974c1c93ef596be13de2b7601"
+
+[[artefact]]
+path = "dumps/atom-table-full.tape.gz"
+produced_by = "./bxtrace/record.escript dump-atom-table-full"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the atom table filled, one of the aborts the VM raises itself"
+needed_by = ["m62"]
+bytes = 100309
+sha256 = "e75d01e8ae95a67a55e436b9afa57f4ced5934f9d29c9c2ac00f1dbcb1f1fdac"
+
+[[artefact]]
+path = "dumps/port-table-full.tape.gz"
+produced_by = "./bxtrace/record.escript dump-port-table-full"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the port table filled, so the dump has a full port table to read"
+needed_by = ["m62"]
+bytes = 138298
+sha256 = "4d9e1cb466da8fe6f88240181d9767574ee8bce9586bf506595b20998101d081"
+
+[[artefact]]
+path = "dumps/sigusr1.tape.gz"
+produced_by = "./bxtrace/record.escript dump-sigusr1"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a dump asked for by an operator with a signal, on a node that was fine"
+needed_by = ["m62"]
+bytes = 100262
+sha256 = "23d7c114ffb8d1d49deb4e66fc2e326428949c47fec1c682ab5a44452db7c946"
+
+[[artefact]]
+path = "dumps/truncated.tape.gz"
+produced_by = "./bxtrace/record.escript dump-truncated"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a dump that stops mid section, because the byte budget ran out"
+needed_by = ["m62"]
+bytes = 26704
+sha256 = "316e1f89f2a5e28a2c8d841b1226df93b6d2b55da8ec372757f6dc05cf42980c"
+
+[[artefact]]
+path = "dumps/many-processes.tape.gz"
+produced_by = "./bxtrace/record.escript dump-many-processes"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt with two thousand processes alive, so the process table is the dump"
+needed_by = ["m62"]
+bytes = 442808
+sha256 = "50e7c5dce9401185391f198eed1d5635d7eef42ac3e7888ab22e2451f9c1b749"
+
+[[artefact]]
+path = "dumps/dirty-scheduler.tape.gz"
+produced_by = "./bxtrace/record.escript dump-dirty-scheduler"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt while a dirty CPU scheduler is in the middle of a job"
+needed_by = ["m62"]
+bytes = 100674
+sha256 = "61053599ce71dce37b38810fa69d98fd4aafb3700b357f02441d26f56cc497e0"
+
+[[artefact]]
+path = "dumps/large-heap.tape.gz"
+produced_by = "./bxtrace/record.escript dump-large-heap"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt with one process holding a two million element list"
+needed_by = ["m62"]
+bytes = 101856
+sha256 = "d753a8742113a64971222c35c412086508d3bd1b61c43a4ae5c8d597d0512bb4"
+
+[[artefact]]
+path = "dumps/long-message-queue.tape.gz"
+produced_by = "./bxtrace/record.escript dump-long-message-queue"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt with fifty thousand messages queued for a process that is not reading"
+needed_by = ["m62"]
+bytes = 100779
+sha256 = "600fd998bbf96d93fa8b530dc08767fc1a2fcdb94811c072eae6ed444eaed59b"
+
+[[artefact]]
+path = "dumps/many-ets-tables.tape.gz"
+produced_by = "./bxtrace/record.escript dump-many-ets-tables"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt with five hundred ETS tables holding rows"
+needed_by = ["m62"]
+bytes = 132416
+sha256 = "ffd61fa0827bfa5ca3fc4c5b2311ef0671e107a347a6647eb537de7366aab331"
+
+[[artefact]]
+path = "dumps/distributed.tape.gz"
+produced_by = "./bxtrace/record.escript dump-distributed"
+kind = "postmortem"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "a halt on a node that was connected to another one"
+needed_by = ["m62"]
+bytes = 105364
+sha256 = "013be89f470c227546c35a54cd87ab911aa987ae9e67639a388be09740a46863"
+
 # The inputs the recordings were made from. These are written by hand rather
 # than recorded, so provenance for them is just what they are for and what came
 # out of them. `used_by` is what makes a source that nothing is recorded from
