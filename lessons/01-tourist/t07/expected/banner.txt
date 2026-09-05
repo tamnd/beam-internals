@@ -1,0 +1,6 @@
+Erlang/OTP 29 [erts-17.0.5] [...]
+
+otp release        29
+emulator flavor    jit
+schedulers online  <N>
+word size          64 bit

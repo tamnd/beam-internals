@@ -76,10 +76,16 @@ bake-write *lessons:
     python3 -m tools.bake --write {{ lessons }}
 
 # The half that needs no Erlang, which is why it can live in `check`. Every
-# elixir cell is accounted for in meta.toml, every deterministic cell has a
+# elixir cell is accounted for in meta.toml, every compared cell has a
 # recording, and the output printed inside the lesson matches that recording.
 bake-offline:
     python3 -m tools.bake --offline
+
+# The filters a lesson can name in `[bake.normalised]`, and what each one
+# erases. A cell that prints a pid or a duration needs one of these before its
+# output can be compared against a recording.
+filters:
+    python3 -m tools.normalise
 
 # The conformance suites, against whatever release is on the path. Needs an
 # Erlang release and nothing else, which is the whole design of the runner. Not

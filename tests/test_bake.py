@@ -128,11 +128,11 @@ def test_a_lesson_that_lines_up_has_no_problems(tmp_path: Path) -> None:
     assert bake.bookkeeping(room, bake.parse(room / "lesson.livemd")) == []
 
 
-def test_a_cell_in_neither_list_is_reported(tmp_path: Path) -> None:
+def test_a_cell_in_no_list_is_reported(tmp_path: Path) -> None:
     meta = META.replace('not_compared = ["banner"]', "not_compared = []")
     room = lesson(tmp_path, meta=meta, answer="42\n")
     problems = bake.bookkeeping(room, bake.parse(room / "lesson.livemd"))
-    assert any("banner" in p and "neither list" in p for p in problems)
+    assert any("banner" in p and "in no list" in p for p in problems)
 
 
 def test_a_listed_cell_the_notebook_does_not_have_is_reported(tmp_path: Path) -> None:
@@ -210,6 +210,111 @@ def test_write_says_so_rather_than_raising_a_key_error(tmp_path: Path) -> None:
     cells = bake.parse(room / "lesson.livemd")
     with pytest.raises(bake.Broken, match=re.escape("no [bake] section")):
         bake.write(room, cells, {"banner": "hello\n", "answer": "42\n"})
+
+
+# A lesson with one cell that prints something different on every machine, which
+# is the case the normalised list exists for.
+NOISY = """\
+# A lesson
+
+<!-- cell: owner -->
+
+```elixir
+IO.puts("owner #{inspect(self())} finished at 12 ms")
+```
+
+```
+owner #PID<0.213.0> finished at 12 ms
+```
+"""
+
+NOISY_META = """\
+id = "x99"
+
+[bake]
+deterministic = []
+not_compared = []
+
+[bake.normalised]
+owner = ["pids", "times"]
+"""
+
+FILTERED = "owner #PID<0.PID.0> finished at <TIME> ms\n"
+
+
+def test_a_normalised_cell_is_compared_through_its_filters(tmp_path: Path) -> None:
+    """The point of the whole thing. The same cell on a second machine prints a
+    different pid and a different duration and still passes."""
+    room = lesson(tmp_path, notebook=NOISY, meta=NOISY_META, owner=FILTERED)
+    cells = bake.parse(room / "lesson.livemd")
+    assert bake.bookkeeping(room, cells) == []
+
+    elsewhere = {"owner": "owner #PID<0.98.0> finished at 4009 ms\n"}
+    assert bake.compare(room, cells, elsewhere) == []
+
+
+def test_a_normalised_cell_still_catches_a_real_change(tmp_path: Path) -> None:
+    """The other half, and the half worth being nervous about. A filter that
+    erased enough to make everything pass would be worse than no filter."""
+    room = lesson(tmp_path, notebook=NOISY, meta=NOISY_META, owner=FILTERED)
+    cells = bake.parse(room / "lesson.livemd")
+
+    changed = {"owner": "holder #PID<0.98.0> finished at 4009 ms\n"}
+    problems = bake.compare(room, cells, changed)
+    assert any("owner printed something else" in p for p in problems)
+
+
+def test_a_normalised_cell_keeps_the_page_and_the_recording_in_step(tmp_path: Path) -> None:
+    """The page shows what a machine really printed, because a reader wants to
+    see a pid rather than the word PID. So the two are compared through the
+    filters rather than byte for byte."""
+    room = lesson(tmp_path, notebook=NOISY, meta=NOISY_META, owner=FILTERED)
+    assert bake.bookkeeping(room, bake.parse(room / "lesson.livemd")) == []
+
+    stale = NOISY.replace("finished at 12 ms", "finished in 12 ms")
+    room = lesson(tmp_path / "again", notebook=stale, meta=NOISY_META, owner=FILTERED)
+    problems = bake.bookkeeping(room, bake.parse(room / "lesson.livemd"))
+    assert any("is not what expected/owner.txt records" in p for p in problems)
+
+
+def test_write_puts_the_raw_output_on_the_page_and_the_filtered_form_in_the_recording(
+    tmp_path: Path,
+) -> None:
+    room = lesson(tmp_path, notebook=NOISY, meta=NOISY_META, owner=FILTERED)
+    cells = bake.parse(room / "lesson.livemd")
+    bake.write(room, cells, {"owner": "owner #PID<0.98.0> finished at 4009 ms\n"})
+
+    assert (room / "expected" / "owner.txt").read_text() == FILTERED
+    assert "owner #PID<0.98.0> finished at 4009 ms" in (room / "lesson.livemd").read_text()
+
+
+def test_a_filter_that_does_not_exist_is_reported(tmp_path: Path) -> None:
+    meta = NOISY_META.replace('["pids", "times"]', '["pids", "timings"]')
+    room = lesson(tmp_path, notebook=NOISY, meta=meta, owner=FILTERED)
+    problems = bake.bookkeeping(room, bake.parse(room / "lesson.livemd"))
+    assert any("no such filter" in p and "timings" in p for p in problems)
+
+
+def test_a_filter_with_nothing_to_erase_is_reported(tmp_path: Path) -> None:
+    """A filter copied from another lesson costs nothing at runtime and tells a
+    reader of meta.toml something untrue about the cell."""
+    meta = NOISY_META.replace('["pids", "times"]', '["pids", "times", "paths"]')
+    room = lesson(tmp_path, notebook=NOISY, meta=meta, owner=FILTERED)
+    problems = bake.bookkeeping(room, bake.parse(room / "lesson.livemd"))
+    assert any("paths" in p and "nothing in its output for that filter to erase" in p for p in problems)
+
+
+def test_a_normalised_cell_with_no_recording_is_reported(tmp_path: Path) -> None:
+    room = lesson(tmp_path, notebook=NOISY, meta=NOISY_META)
+    problems = bake.bookkeeping(room, bake.parse(room / "lesson.livemd"))
+    assert any("expected/owner.txt" in p for p in problems)
+
+
+def test_a_name_in_the_normalised_list_and_another_list_is_reported(tmp_path: Path) -> None:
+    meta = NOISY_META.replace("not_compared = []", 'not_compared = ["owner"]')
+    room = lesson(tmp_path, notebook=NOISY, meta=meta, owner=FILTERED)
+    problems = bake.bookkeeping(room, bake.parse(room / "lesson.livemd"))
+    assert any("listed as normalised and as not compared" in p for p in problems)
 
 
 def test_every_lesson_in_the_repository_keeps_its_books(tmp_path: Path) -> None:

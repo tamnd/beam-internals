@@ -43,9 +43,29 @@ deterministic = [
   "boss",
 ]
 
-# Cells that print wall clock times or machine details. They are run to check
-# they do not crash, and their output is not compared.
-not_compared = ["banner", "fairness", "not-time"]
+# Cells that are run to check they do not crash and whose output is not
+# compared. Both of these were tried through the filters first and neither
+# survives, for the same reason in two shapes.
+#
+# `fairness` prints four finishing times and the spread between them. Filtering
+# the times erases the spread, and the spread is the answer: zero on one core is
+# the whole point of the cell. Leaving the spread alone does not work either,
+# because the spread on the all cores block is noise. The number to keep and the
+# number to erase are the same number printed twice.
+#
+# `not-time` prints reduction counts, and they move by a few hundred between
+# runs on one machine, so they are not deterministic and they are also exactly
+# what the cell is about. A filter that erased them would erase the lesson.
+not_compared = ["fairness", "not-time"]
+
+# Cells whose output is the same everywhere once the noise is filtered out. The
+# banner prints the emulator's build line, which carries this machine's
+# scheduler counts and whichever optional features it was built with, and then
+# prints the scheduler count again on a line of its own. Erase those two and
+# what is left is the release, the erts version, the flavor and the word size,
+# which is what the lesson is pinned to and worth comparing.
+[bake.normalised]
+banner = ["build-flags", "schedulers"]
 
 [verified]
 # Both architectures, both on the JIT, both on the pinned release. Verified by
