@@ -21,6 +21,8 @@ cases() ->
         {"an empty file is not a tape", fun empty/0},
         {"comments and blank lines are skipped", fun comments/0},
         {"a binary holding a newline survives the round trip", fun newline_in_a_binary/0},
+        {"text on a tape is written as text and not as bytes", fun text_stays_text/0},
+        {"one term is one line however long the term is", fun one_term_one_line/0},
         {"an atom needing quotes survives the round trip", fun awkward_atom/0},
         {"a deep term survives the round trip", fun deep_term/0},
         {"a pid may not go on a tape", fun no_pids/0},
@@ -139,6 +141,44 @@ newline_in_a_binary() ->
     with_tape("newline", [Event], fun(Path) ->
         {ok, _, Events} = bxtrace_tape:read(Path),
         ?EQ("the binary with the newline in it", [Event], Events)
+    end).
+
+%% The claim the format makes is that a tape can be diffed and the diff read by
+%% a person. A writer using ~w keeps that claim technically true and practically
+%% false: the OTP release in every header comes out as <<50,57>> instead of
+%% <<"29">>, parses back to the same binary, and tells a reader nothing. So the
+%% check is on the bytes in the file rather than on what comes back out of it,
+%% because the round trip passes either way.
+lines(Path) ->
+    {ok, Fd} = file:open(Path, [read, compressed, {encoding, utf8}]),
+    try
+        collect(Fd, [])
+    after
+        file:close(Fd)
+    end.
+
+collect(Fd, Done) ->
+    case io:get_line(Fd, "") of
+        eof -> lists:reverse(Done);
+        Line -> collect(Fd, [string:trim(Line) | Done])
+    end.
+
+text_stays_text() ->
+    with_tape("readable", [{note, <<"a spinner ran out of budget">>}], fun(Path) ->
+        Joined = lists:flatten(lines(Path)),
+        Found = string:find(Joined, "<<\"a spinner ran out of budget\">>"),
+        ct_assert:is_true("the binary is written as the text it holds", Found =/= nomatch)
+    end).
+
+%% A term that would not fit in eighty columns still has to be one line, because
+%% every reader of this format counts on being able to stop after one.
+one_term_one_line() ->
+    Long = {wide, lists:seq(1, 400), <<"and a binary on the end of it as well">>},
+    with_tape("one-line", [Long], fun(Path) ->
+        %% The comment, the header, the event, the footer.
+        ?EQ("lines in the file", 4, length(lines(Path))),
+        {ok, _, Events} = bxtrace_tape:read(Path),
+        ?EQ("and it still reads back", [Long], Events)
     end).
 
 awkward_atom() ->

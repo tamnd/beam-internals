@@ -29,6 +29,22 @@
 -define(SCHEMA, 1).
 -define(END, '$tape_end').
 
+%% How a term is written down, and the three modifiers all matter.
+%%
+%% The zero is the line width, and zero means never wrap. A term broken across
+%% four lines to fit in eighty columns would break the one term per line rule
+%% the whole format rests on.
+%%
+%% The `t' is unicode. Without it an atom or a binary holding anything above
+%% latin1 comes out as escapes, and the file is opened as utf8, so it can hold
+%% the characters themselves.
+%%
+%% The `p' rather than `w' is the readability. `~w' writes <<"29">> as
+%% <<50,57>>, which parses back to the same binary and tells a person nothing.
+%% Both round trip through erl_parse, so the only difference is whether the
+%% claim about being diffable by a person is true.
+-define(TERM, "~0tp.~n").
+
 %% The schema version, bumped when the shape of a header or an event changes in
 %% a way an older reader would get wrong. A reader that meets a tape from the
 %% future says so rather than guessing.
@@ -74,7 +90,7 @@ open(Path, Header) when is_map(Header) ->
                 {ok, Fd} ->
                     Kind = maps:get(kind, Header, unknown),
                     io:format(Fd, "%% bxtrace tape, schema ~b, kind ~w~n", [?SCHEMA, Kind]),
-                    io:format(Fd, "~w.~n", [Header]),
+                    io:format(Fd, ?TERM, [Header]),
                     {ok, #{fd => Fd, path => Path, written => 0}};
                 {error, Reason} ->
                     {error, {cannot_write, Path, Reason}}
@@ -91,14 +107,14 @@ open(Path, Header) when is_map(Header) ->
 write(#{fd := Fd, written := Written} = Tape, Event) ->
     case portable(Event) of
         ok ->
-            io:format(Fd, "~w.~n", [Event]),
+            io:format(Fd, ?TERM, [Event]),
             Tape#{written := Written + 1};
         {not_portable, _, _} = Problem ->
             error({bxtrace_tape, explain(Problem)})
     end.
 
 close(#{fd := Fd, path := Path, written := Written}) ->
-    io:format(Fd, "~w.~n", [{?END, Written}]),
+    io:format(Fd, ?TERM, [{?END, Written}]),
     ok = file:close(Fd),
     {ok, Path, Written}.
 
