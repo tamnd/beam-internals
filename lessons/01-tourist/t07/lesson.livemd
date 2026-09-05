@@ -143,30 +143,37 @@ The VM told you the size of the budget. It did not tell you the unit. That is th
 <!-- cell: measure -->
 
 ```elixir
-measure = fn fun ->
-  parent = self()
+defmodule Bench do
+  # Something to measure the harness against, which has to do nothing at all.
+  def nothing, do: :ok
 
-  pid =
-    spawn(fn ->
-      {:reductions, before} = Process.info(self(), :reductions)
-      fun.()
-      {:reductions, after_} = Process.info(self(), :reductions)
-      send(parent, {self(), after_ - before})
-    end)
+  def cost(fun, args) do
+    parent = self()
 
-  receive do
-    {^pid, delta} -> delta
+    pid =
+      spawn(fn ->
+        {:reductions, before} = Process.info(self(), :reductions)
+        apply(fun, args)
+        {:reductions, after_} = Process.info(self(), :reductions)
+        send(parent, {self(), after_ - before})
+      end)
+
+    receive do
+      {^pid, delta} -> delta
+    end
   end
 end
 
-IO.puts("an empty function costs #{measure.(fn -> :ok end)} reductions")
+IO.puts("the harness itself costs #{Bench.cost(&Bench.nothing/0, [])} reductions")
 ```
 
 ```
-an empty function costs 5 reductions
+the harness itself costs 5 reductions
 ```
 
-Five is the cost of the harness itself. The two `Process.info` calls and the spawn are not free. Subtract it from everything below and you are measuring the thing you asked about rather than the question.
+Five is the cost of the harness. Two `Process.info` calls, an `apply`, and entering and leaving a function that does nothing. Subtract it from everything below and you are measuring the thing you asked about rather than the question.
+
+The harness is a module and not four lines in the cell, and that is not tidiness. Code typed into a notebook cell is evaluated rather than compiled, and the evaluator spends reductions of its own working out what your code means. Measure a loop through an anonymous function written in a cell and you are counting the evaluator alongside the loop, to the tune of about sixty reductions. Inside a module the whole measured path is compiled, so the baseline you subtract is made of the same parts as the run you subtract it from.
 
 Now three loops that differ only in the shape of the call.
 
@@ -189,22 +196,22 @@ defmodule Loop do
 end
 
 n = 100_000
-baseline = measure.(fn -> :ok end)
+baseline = Bench.cost(&Bench.nothing/0, [])
 
-for {name, fun} <- [
-      {"tail call", fn -> Loop.tail(n) end},
-      {"body call", fn -> Loop.body(n) end},
-      {"call through a leaf", fn -> Loop.through_leaf(n, 0) end}
+for {name, fun, args} <- [
+      {"tail call", &Loop.tail/1, [n]},
+      {"body call", &Loop.body/1, [n]},
+      {"call through a leaf", &Loop.through_leaf/2, [n, 0]}
     ] do
-  total = measure.(fun) - baseline
+  total = Bench.cost(fun, args) - baseline
   IO.puts("#{String.pad_trailing(name, 20)} #{String.pad_leading("#{total}", 7)}  #{Float.round(total / n, 4)} per iteration")
 end
 ```
 
 ```
-tail call             100001  1.0 per iteration
-body call             200015  2.0002 per iteration
-call through a leaf   300001  3.0 per iteration
+tail call             100000  1.0 per iteration
+body call             200014  2.0001 per iteration
+call through a leaf   300000  3.0 per iteration
 ```
 
 One, two, three. Clean enough that the rule falls out of the numbers.
@@ -215,11 +222,13 @@ The rule is: **one reduction when a function is entered, one reduction when a fu
 
 Check the three rows against it.
 
-`tail/1` enters itself 100000 times and returns once at the very end, because a tail call replaces the current frame instead of stacking on top of it. That is 100001.
+`tail/1` enters itself 100000 times and never returns until the very end, because a tail call replaces the current frame instead of stacking on top of it. One each, 100000.
 
-`body/1` enters itself 100000 times and returns 100000 times, because `1 + body(n - 1)` has to come back to do the addition. That is 200000, and the measurement says 200015. The extra fifteen are garbage collection. A hundred thousand stacked frames is a large stack, growing it triggers a collection, and the collector charges the process for the work. Reduction accounting includes runtime work done on your behalf, not only your own calls.
+`body/1` enters itself 100000 times and returns 100000 times, because `1 + body(n - 1)` has to come back to do the addition. That is 200000, and the measurement says 200014. The extra fourteen are garbage collection. A hundred thousand stacked frames is a large stack, growing it triggers a collection, and the collector charges the process for the work. Reduction accounting includes runtime work done on your behalf, not only your own calls.
 
 `through_leaf/2` enters itself, enters `leaf/1`, and `leaf/1` returns. Three per iteration.
+
+The single entry and the single final return are in the baseline, which is why the totals come out at exactly a hundred thousand times the per iteration cost. `Bench.nothing/0` is entered once and returns once as well.
 
 ## The counter, and what happens when it runs out
 
@@ -284,18 +293,19 @@ You can count the swaps. Tracing a process with the `running` flag delivers an e
 preemptions = fn reductions ->
   parent = self()
 
+  # Tracing goes on before the worker exists, not after. Spawning first and
+  # then tracing is a race: the worker can be scheduled out before the tracing
+  # is switched on, and whether that shows up in the count depends on which of
+  # the two wins, which is not a thing to build a measurement on.
+  :erlang.trace(:new_processes, true, [:running])
+
   worker =
     spawn(fn ->
-      receive do
-        :go -> :ok
-      end
-
       Loop.tail(reductions)
       send(parent, :finished)
     end)
 
-  :erlang.trace(worker, true, [:running])
-  send(worker, :go)
+  :erlang.trace(:new_processes, false, [:running])
 
   count = fn count, acc ->
     receive do
@@ -411,15 +421,15 @@ defmodule DifferentResult do
 end
 
 n = 100_000
-baseline = measure.(fn -> :ok end)
+baseline = Bench.cost(&Bench.nothing/0, [])
 
-IO.puts("every clause returns :done      #{measure.(fn -> SameResult.drop(n) end) - baseline}")
-IO.puts("the clauses return different    #{measure.(fn -> DifferentResult.drop(n) end) - baseline}")
+IO.puts("every clause returns :done      #{Bench.cost(&SameResult.drop/1, [n]) - baseline}")
+IO.puts("the clauses return different    #{Bench.cost(&DifferentResult.drop/1, [n]) - baseline}")
 ```
 
 ```
-every clause returns :done      100001
-the clauses return different    200015
+every clause returns :done      100000
+the clauses return different    200014
 ```
 
 The two modules have the same shape. The recursive call is followed by another expression in both, so neither is a tail call as written. One of them costs half as much as the other.

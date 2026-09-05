@@ -48,8 +48,11 @@ deterministic = [
 not_compared = ["banner", "fairness", "not-time"]
 
 [verified]
-# Both architectures, both on the JIT, both on the pinned release.
+# Both architectures, both on the JIT, both on the pinned release. Verified by
+# `just bake`, which pulls the cells out of the notebook and runs them the way
+# Livebook runs them, rather than by somebody copying numbers off a screen.
 "aarch64-darwin" = "OTP 29 erts-17.0.5"
 "x86_64-linux" = "OTP 29 erts-17.0.5"
-on = 2026-09-02
+on = 2026-09-05
 by = "tamnd"
+how = "just bake t07"

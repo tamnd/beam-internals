@@ -142,6 +142,41 @@ jobs:
       - name: Every case in every suite
         run: ./conformance/run.escript
 
+  bake:
+    name: every lesson cell still prints what the lesson says
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          persist-credentials: false
+
+      # The release the lessons were recorded against. A lesson baked on a
+      # different release has been checked against a different runtime, and the
+      # numbers in these lessons are the whole point of them.
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124  # v1.24.1
+        with:
+          otp-version: "29.0.5"
+          elixir-version: "1.20.4"
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # This is the gate the recordings exist for. Every cell of every lesson is
+      # run in order in one session, the way Livebook runs them, and the output
+      # is compared against expected/. A number that moves because a release
+      # changed underneath a lesson fails here, which is the only place it can be
+      # caught before a reader catches it.
+      - name: Bake
+        run: python -m tools.bake
+
+      # A green bake leaves the tree exactly as it found it. If anything moved
+      # then something is writing during a read only run, which would make the
+      # comparison meaningless.
+      - name: The run changed nothing
+        run: git diff --exit-code
+
   animations:
     name: animations still render
     runs-on: ubuntu-latest

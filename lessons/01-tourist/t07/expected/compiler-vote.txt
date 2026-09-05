@@ -1,2 +1,2 @@
-every clause returns :done      100001
-the clauses return different    200015
+every clause returns :done      100000
+the clauses return different    200014
