@@ -142,6 +142,12 @@ jobs:
       - name: Every case in every suite
         run: ./conformance/run.escript
 
+      # Our own code, kept in the same job because it needs the same release and
+      # nothing else, and reported separately because a failure here is news
+      # about us rather than news about Erlang.
+      - name: The tape recorders
+        run: ./bxtrace/test.escript
+
   bake:
     name: every lesson cell still prints what the lesson says
     runs-on: ubuntu-latest
