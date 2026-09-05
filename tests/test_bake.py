@@ -9,6 +9,7 @@ missing from a list.
 
 from __future__ import annotations
 
+import re
 import textwrap
 from pathlib import Path
 
@@ -199,6 +200,16 @@ def test_write_leaves_a_cell_whose_output_did_not_move_alone(tmp_path: Path) -> 
 
     assert bake.write(room, cells, {"banner": "hello\n", "answer": "42\n"}) == []
     assert (room / "lesson.livemd").read_text() == before
+
+
+def test_write_says_so_rather_than_raising_a_key_error(tmp_path: Path) -> None:
+    """`--write` runs even when the bookkeeping is unhappy, because half of what
+    the bookkeeping reports is exactly what writing is there to fix. A lesson
+    with no [bake] section at all is the one thing it cannot fix."""
+    room = lesson(tmp_path, meta='id = "x99"\n')
+    cells = bake.parse(room / "lesson.livemd")
+    with pytest.raises(bake.Broken, match=re.escape("no [bake] section")):
+        bake.write(room, cells, {"banner": "hello\n", "answer": "42\n"})
 
 
 def test_every_lesson_in_the_repository_keeps_its_books(tmp_path: Path) -> None:

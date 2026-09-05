@@ -251,6 +251,8 @@ def compare(lesson: Path, cells: list[Cell], output: dict[str, str]) -> list[str
 def write(lesson: Path, cells: list[Cell], output: dict[str, str]) -> list[str]:
     """Rewrite the recordings, and the copy the lesson shows, from this run."""
     meta = tomllib.loads((lesson / "meta.toml").read_text(encoding="utf-8"))
+    if "bake" not in meta:
+        raise Broken(f"{lesson.name}: meta.toml has no [bake] section, so there is nothing to write")
     deterministic = meta["bake"]["deterministic"]
     changed: list[str] = []
 
@@ -310,26 +312,41 @@ def main() -> int:
 
         cell_count += len(cells)
         found = bookkeeping(lesson, cells)
-        problems.extend(found)
 
         if args.offline:
+            problems.extend(found)
             continue
 
-        # A lesson whose bookkeeping is wrong is not worth running. The run would
-        # fail on the same thing and take a minute longer to say so.
-        if found:
+        # A lesson whose books do not add up is not worth running, unless the
+        # point of the run is to fix the books. Half of what bookkeeping reports
+        # is a recording that has gone stale, and refusing to write a fresh one
+        # until somebody fixes the stale one by hand is a tool arguing with the
+        # person using it.
+        if found and not args.write:
+            problems.extend(found)
             continue
 
         try:
             output = produce(lesson, cells)
         except Broken as problem:
+            problems.extend(found)
             problems.append(f"bake: {problem}")
             continue
 
-        if args.write:
-            notes.extend(write(lesson, cells, output))
-        else:
+        if not args.write:
             problems.extend(compare(lesson, cells, output))
+            continue
+
+        try:
+            notes.extend(write(lesson, cells, output))
+        except Broken as problem:
+            problems.append(f"bake: {problem}")
+            continue
+
+        # Whatever writing could not fix is still a problem, and what is left is
+        # the set that needs a person: a cell in no list, a recording with no
+        # cell, a name in both lists.
+        problems.extend(bookkeeping(lesson, parse(lesson / "lesson.livemd")))
 
     for note in notes:
         print(note)
