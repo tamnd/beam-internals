@@ -123,6 +123,51 @@ needed_by = ["m26"]
 bytes = 2841
 sha256 = "1dfb137e550948db2c08fc39374f127584d9ce75b91cd63e1a0e096ddeec072b"
 
+# The two wire tapes, which are every byte two nodes send each other while they
+# get connected. Recorded through a relay sitting between two stock nodes, so
+# both ends of the conversation are the real thing and the only thing that was
+# arranged is which port one of them dialled.
+#
+# There are two because the pair is the argument. The connecting node is hidden
+# in the second one, which turns off a single flag, and the handshake is the
+# same 133 bytes either way while everything after it is not.
+#
+# Both hold the cookie they were recorded with, which is what lets a reader
+# recompute the two digests and check that the recording is a handshake that
+# really worked. The cookie was invented for the recording and the nodes lived
+# for a second on the loopback interface. See bxtrace/src/bxtrace_wire.erl for
+# why that is the only way this may be done.
+
+[[artefact]]
+path = "dist/handshake.tape.gz"
+produced_by = "./bxtrace/record.escript handshake"
+kind = "wire"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the five messages two nodes exchange before they are connected"
+needed_by = ["m56"]
+bytes = 1689
+sha256 = "77268239c6b91376fbee9eb20fda7f0c3f7afb3894ab7a1dad5b77acddb980d5"
+
+[[artefact]]
+path = "dist/handshake-hidden.tape.gz"
+produced_by = "./bxtrace/record.escript handshake-hidden"
+kind = "wire"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the same handshake from a hidden node, which is one flag different"
+needed_by = ["m56"]
+bytes = 600
+sha256 = "14e5a992f87f24a22e0372a42b5653e5a36ef545f91bfa1c1d769bbeb5fb7f09"
+
 [[artefact]]
 path = "traces/one-spinner.tape.gz"
 produced_by = "./bxtrace/record.escript one-spinner"

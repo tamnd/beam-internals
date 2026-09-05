@@ -64,7 +64,7 @@ corpora/
   chunks/            .beam files and their chunk dumps
   dumps/             fourteen crash dump specimens, as postmortem tapes
   traces/            trace captures, msacc, instrument
-  dist/              packet captures of a full distribution handshake
+  dist/              wire tapes, every byte of a distribution handshake
   tables/            genop.tab, ops.tab, bif.tab, atom.names snapshots
 ```
 
@@ -86,6 +86,8 @@ bxtrace/
   src/bxtrace_post.erl   the postmortem tape, a crash dump turned into an index
   src/bxtrace_dis.erl    the disassembly tape, what the loader left in memory
   src/bxtrace_jdump.erl  the native code tape, what the JIT emitted for a module
+  src/bxtrace_wire.erl   the wire tape, what two nodes send each other to connect
+  src/bxtrace_wire_epmd.erl  the one wrong answer that makes a handshake recordable
   src/bxtrace_specimen.erl  the fourteen crash dumps, and how each one is produced
   test/                  the tests, run by test.escript
   test.escript           our own code, needs a release and nothing else
@@ -112,6 +114,7 @@ Small programs, standard library only wherever possible, so they run in seconds 
 | `normalise` | Erases the pids, ports, references, durations, paths and node names that stop a cell's output from being compared. |
 | `dis` | Prints a disassembly tape as a memory layout, so the opcodes the loader chose can be read without an interpreter build. |
 | `jdump` | Prints a native code tape, and puts two of them side by side, so what the JIT emitted on each architecture can be compared without owning both machines. |
+| `wire` | Decodes a distribution handshake off a wire tape, recomputes both digests from the cookie, and names every flag the two sides offered. |
 | `drift` | Watches upstream and opens issues. Never edits content. |
 
 ## site
