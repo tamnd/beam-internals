@@ -45,7 +45,7 @@ Every fact a machine can state about itself is filled in by `bxtrace_tape:header
 | field | why it is there |
 | --- | --- |
 | `schema` | A reader meeting a tape from the future says so rather than guessing. |
-| `kind` | `reds`, `pass`, `dis`, `jdump` or `postmortem`. |
+| `kind` | `reds`, `pass`, `dis`, `jdump`, `wire` or `postmortem`. |
 | `recorded`, `by_whom`, `why` | Provenance. The same rule `corpora/manifest.toml` states. |
 | `otp`, `erts`, `build` | Two builds of the same release do not behave the same. |
 | `arch`, `wordsize` | Heap words are a different number of bytes on each. |
@@ -254,6 +254,56 @@ Those bytes turn up in one more place, and finding it is the reason a section ma
 The mirror image of the disassembly tape. The interpreter has no JIT, `+JDdump true` on it writes nothing, and the recorder refuses rather than reading a file that was never created. So the two tapes cannot come off the same machine, and running the tests on either flavor leaves the other one's cases reported as skipped with the reason next to them.
 
 It also needs both architectures, which is the part with no way around it. An x86-64 machine cannot produce the AArch64 tape, and that is exactly why the pair is committed.
+
+## The wire tape
+
+`bxtrace_wire:record/2` starts two nodes, connects one to the other through a relay it controls, and writes down every byte that went past.
+
+```erlang
+{ok, Result} = bxtrace_wire:record("corpora/dist/handshake.tape.gz",
+                                   #{by_whom => "tamnd",
+                                     why     => "the five messages before a connection",
+                                     hidden  => false}).
+```
+
+There is one kind of event and it holds bytes.
+
+```erlang
+{segment,1,a_to_b,10320,<<0,39,78,0,0,0,109,7,223,127,189,106,156,158,203,0,24,98,...>>}.
+{segment,2,b_to_a,91358,<<0,3,115,111,107>>}.
+```
+
+Nothing is decoded by the recorder. `tools/wire.py` does all of it, which means the decoder can be wrong and be fixed without recording two nodes again, and it means a reader who disagrees with the decoder has the bytes to argue with.
+
+A segment is one read off a socket, not one message. TCP is a stream and where one read ends is the operating system's business, so a message can arrive split across two segments and two messages can arrive in one. The last handshake message and the first frame after it usually do arrive together, which is exactly the case a reader that treated a segment as a message would get wrong.
+
+### Getting at the bytes at all
+
+Two nodes talking is easy to arrange and hard to watch, because the bytes go straight from one socket to another. The two ways in are tcpdump as root or something in the middle. Root is not available in the container CI runs in and is not a reasonable thing for a recorder to want, so this is something in the middle.
+
+A relay cannot pretend to be the far node. The handshake carries the responder's name and the initiator checks it against the atom of the node it asked for, at `lib/kernel/src/dist_util.erl:recv_challenge_new@OTP-29.0.5`, so a relay answering under its own name is hung up on. It has to sit in front of the real node instead, which is the better outcome anyway: both ends of the recording are stock nodes doing the real thing.
+
+The initiator is made to dial the relay by one wrong answer. A node about to connect asks its epmd module where the other node is, at `lib/kernel/src/inet_tcp_dist.erl:456@OTP-29.0.5`, and `-epmd_module` says which module that is. `bxtrace_wire_epmd` hands every question to `erl_epmd` except one: asked for the node being recorded, it gives the relay's port. Nothing else about either node changes and neither of them can tell.
+
+### The cookie is on the tape, and that is a warning
+
+The last two messages are md5 of the cookie followed by the challenge in decimal, at `lib/kernel/src/dist_util.erl:546@OTP-29.0.5`. Writing the cookie down is what lets a reader recompute both digests and prove the tape is a recording of a handshake that really happened between two nodes that really knew the cookie. `tools/wire.py` does that every time it reads a tape and refuses one whose digests do not recompute.
+
+It is also why this is the one recorder that must never be pointed at a cluster anybody uses. A captured handshake is a challenge and a digest of a short word, and short words do not survive being guessed at offline by a machine that has all the time in the world. The cookie here is invented for the recording, the two nodes exist for a second, and they only ever listen on the loopback address.
+
+### Two connections, one flag
+
+The pair in `corpora/dist/` is the same two nodes with the connecting one started `-hidden` in the second recording. That turns off `published` and changes nothing else about the handshake, which is still the same 133 bytes.
+
+What it changes is everything after. An ordinary connection carries about three and a half kilobytes immediately, which is two global name servers introducing themselves. A hidden one carries nothing at all. One bit in a field, and the difference between joining a cluster and being attached to it.
+
+### The size is a constant
+
+133 bytes, and it is arithmetic rather than a measurement. Every field in the five messages is fixed width except the node names, and both nodes are named by this recorder, so the number can be written down and asserted. Both node names use the loopback address rather than whatever the machine calls itself, so a tape recorded on somebody's laptop does not publish the laptop.
+
+### Framing is done three times
+
+The recorder frames the handshake to fill in one header field, `tools/wire.py` frames it to decode it, and `bxtrace_wire_test` frames it again from the protocol as written down in `dist_util`. Three implementations that agree on where the handshake ends are worth more than one implementation agreeing with itself, and the tests compare all three.
 
 ## The postmortem tape
 

@@ -104,6 +104,22 @@ jdump tape="corpora/jdump/l1-x86_64.tape.gz":
 jdump-compare:
     python3 -m tools.jdump --compare corpora/jdump/l1-x86_64.tape.gz corpora/jdump/l1-aarch64.tape.gz
 
+# Every byte two nodes send each other while they get connected, decoded field
+# by field. The reader recomputes both digests from the cookie on the tape, so
+# a tape that prints at all is a recording of a handshake that really worked.
+wire tape="corpora/dist/handshake.tape.gz":
+    python3 -m tools.wire {{ tape }}
+
+# The same handshake with the connecting node hidden. One flag differs, the
+# handshake is the same 133 bytes, and the connection goes quiet afterwards
+# instead of carrying a few kilobytes of global name server.
+wire-hidden:
+    python3 -m tools.wire corpora/dist/handshake-hidden.tape.gz
+
+# The handshake as hex, for reading against the decoded version above.
+wire-bytes tape="corpora/dist/handshake.tape.gz":
+    python3 -m tools.wire --bytes {{ tape }}
+
 # The conformance suites, against whatever release is on the path. Needs an
 # Erlang release and nothing else, which is the whole design of the runner. Not
 # part of `check`, because `check` has to run on a machine with no Erlang.

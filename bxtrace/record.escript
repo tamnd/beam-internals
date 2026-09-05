@@ -179,6 +179,39 @@ fixed() ->
                 })
             end
         }},
+        %% The two wire tapes. Same two nodes, same release, and the only
+        %% difference is that the connecting node is started `-hidden' in the
+        %% second one. That turns off one flag, and the pair is what shows the
+        %% flags to be a negotiation rather than a formality: the handshake is
+        %% the same 133 bytes either way and what happens afterwards is not.
+        %%
+        %% Neither needs a particular machine. They need a loopback interface
+        %% and an epmd, which is what `erl -name' starts on its own.
+        {"handshake", #{
+            path => "dist/handshake.tape.gz",
+            kind => wire,
+            why => "the five messages two nodes exchange before they are connected",
+            needed_by => ["m56"],
+            record => fun(_Root, By, Path) ->
+                bxtrace_wire:record(Path, #{
+                    by_whom => By,
+                    why => "the five messages two nodes exchange before they are connected"
+                })
+            end
+        }},
+        {"handshake-hidden", #{
+            path => "dist/handshake-hidden.tape.gz",
+            kind => wire,
+            why => "the same handshake from a hidden node, which is one flag different",
+            needed_by => ["m56"],
+            record => fun(_Root, By, Path) ->
+                bxtrace_wire:record(Path, #{
+                    by_whom => By,
+                    why => "the same handshake from a hidden node, which is one flag different",
+                    hidden => true
+                })
+            end
+        }},
         {"one-spinner", #{
             path => "traces/one-spinner.tape.gz",
             kind => reds,

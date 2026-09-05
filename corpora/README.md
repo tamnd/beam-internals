@@ -142,6 +142,86 @@ Both need a stock release, because the interpreter has no JIT to dump and the re
 
 `--list` marks each one with what it needs, and running everything on a machine that cannot record one of them says so and skips it rather than failing.
 
+## The wire tapes
+
+Two of them, under `dist/`, and they hold every byte two nodes send each other while they get connected.
+
+A handshake is five messages and 133 bytes, and almost every question about clustering is answered somewhere in them. Which node am I talking to. What does it know how to do. Does it know the cookie. Which incarnation of it is this. All of it goes past in under a millisecond and none of it can be seen from inside either node, because by the time a node can tell you it is connected the handshake is over.
+
+Read one with `just wire`, which needs no runtime.
+
+```
+python3 -m tools.wire corpora/dist/handshake.tape.gz
+python3 -m tools.wire --bytes corpora/dist/handshake.tape.gz
+```
+
+```
+1. a -> b  send_name  39 bytes, tag N
+     who I am and what I can do
+     flags       0x0000006d07df7fbd, 28 of them
+     creation    1788649174
+     name        bxtrace-wire-a@127.0.0.1
+
+2. a <- b  status  3 bytes, tag s
+     whether you are welcome
+     status      ok
+
+3. a <- b  challenge  43 bytes, tag N
+     who I am, what I can do, and a number to sign
+     flags       0x0000006d07df7fbd, 28 of them
+     challenge   396416739
+     creation    1788649170
+     name        bxtrace-wire-b@127.0.0.1
+
+4. a -> b  challenge_reply  21 bytes, tag r
+     your number signed, and one of mine
+     challenge   2940687877
+     digest      984d6972a73c03d76ae69e7d0e61f3c1
+     recomputed  md5 of the cookie and the challenge, and it matches
+
+5. a <- b  challenge_ack  17 bytes, tag a
+     your number signed back
+     digest      50bff359abfe13acc965351d6748fd47
+     recomputed  md5 of the cookie and the challenge, and it matches
+```
+
+The two recomputed lines are the reason these are worth committing. The digest is md5 of the cookie followed by the challenge written out in decimal, at `lib/kernel/src/dist_util.erl:546@OTP-29.0.5`, and each side signs the number the other one sent. Both are recomputed every time a tape is read, so a tape that prints at all is a recording of a handshake that really happened between two nodes that really knew the cookie. A tape whose digests do not recompute is refused rather than shown.
+
+Which means the cookie is on the tape, and that is the one thing to be careful about here. A captured handshake is a challenge and a digest of a short word, and short words do not survive being guessed at offline. The cookie on these tapes was invented for the recording, the two nodes existed for a second, and they only ever listened on the loopback address. Do not point this recorder at a cluster anybody uses.
+
+### One flag, and what it costs
+
+The second tape is the same two nodes with the connecting one started `-hidden`.
+
+```
+27 flags agreed by both sides
+published was offered by only the answering side, so the connection does without it
+```
+
+That is the whole difference in the handshake, which is still 133 bytes. The difference in what follows is not small.
+
+| | ordinary | hidden |
+| --- | --- | --- |
+| handshake | 133 bytes | 133 bytes |
+| frames after it | 24 | none |
+| bytes after it | 2335 | none |
+| flags offered by the connecting side | 28 | 27 |
+
+An ordinary connection starts talking the moment the handshake is done, because two global name servers have found each other and have to agree on what is registered where. A hidden node does not join that, so it connects and says nothing. One bit in a field is the difference between joining a cluster and being attached to it.
+
+### How they were recorded
+
+Not with tcpdump, which needs root that a CI container does not have. A relay sits between two ordinary nodes and copies bytes across while writing down what went which way, so both ends are stock nodes doing the real thing.
+
+The relay cannot pretend to be the far node, because the handshake carries the responder's name and the initiator checks it. So the initiator is made to dial the relay instead, by giving it an `-epmd_module` that answers one question wrongly: asked where the other node is, it gives the relay's port. `bxtrace/README.md` has the rest of it.
+
+```
+./bxtrace/record.escript --by you handshake
+./bxtrace/record.escript --by you handshake-hidden
+```
+
+Neither needs a particular machine. They need a loopback interface and an epmd, and `erl -name` starts an epmd on its own.
+
 ## The crash dump specimens
 
 Fourteen of them, under `dumps/`. Reading a dump is a skill and a skill needs examples, so each one is a node made to die in a particular way.

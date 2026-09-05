@@ -2,10 +2,11 @@
 %% tape.
 %%
 %% A tape is a recording of something the VM did, kept so that it can be
-%% replayed by a reader who was not there. Five kinds exist: the reduction tape,
-%% the pass tape, the disassembly tape, the native code tape and the postmortem.
-%% They record different things and they all sit in this format, because a widget
-%% that can draw one of them should not need a second parser to draw the next.
+%% replayed by a reader who was not there. Six kinds exist: the reduction tape,
+%% the pass tape, the disassembly tape, the native code tape, the wire tape and
+%% the postmortem. They record different things and they all sit in this format,
+%% because a widget that can draw one of them should not need a second parser to
+%% draw the next.
 %%
 %% The file is gzipped text. Inside it there is a comment line, a header term, a
 %% run of event terms one per line, and a footer carrying the count. Text
