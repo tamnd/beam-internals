@@ -129,7 +129,7 @@ It would be no surprise that two machines have different native code. The surpri
 
 `i_flush_stubs` exists only on AArch64, at `erts/emulator/beam/jit/arm/ops.tab:951@OTP-29.0.5`, where the emulator's own comment says it flushes veneers before entering a new function. A branch on AArch64 does not reach the whole address space, so anything far away needs a small trampoline, and the assembler is told where the safe places to put one are.
 
-Nothing on either tape is an address. A stub jumping into the emulator's C code shows up as `mov x14, 4412950416`, which is a different number on every run of the same machine, so any operand that wide is replaced by `addr(N)` against a table kept only while recording. The runs of `.byte` go the same way and for a second reason: they hold the module's own metadata, which includes the full path of the file it was compiled from, so copying them onto a tape would publish a directory off somebody's machine. What is kept is the label and the byte count.
+Nothing on either tape is an address. A stub jumping into the emulator's C code shows up as `mov x14, 4412950416`, which is a different number on every run of the same machine, so any operand that wide is replaced by `addr(N)` against a table kept only while recording. The runs of `.byte` go the same way and for a second reason: they hold the module's own metadata, which includes the full path of the file it was compiled from, so copying them onto a tape would publish a directory off somebody's machine. What is kept is the label and the byte count. `bxtrace/README.md` has the third place those bytes turn up, which is a section marker that sometimes arrives with a piece of a compile chunk sitting in the middle of it.
 
 ### Recording them again
 

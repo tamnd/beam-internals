@@ -247,6 +247,8 @@ Same rule as the disassembly tape, and the dump needs it more. A stub jumping in
 
 Runs of bytes are counted rather than copied, for a second reason on top of that one. They hold the module's own metadata, which includes the full path of the file it was compiled from, so a tape that copied them would publish a directory off somebody's machine.
 
+Those bytes turn up in one more place, and finding it is the reason a section marker keeps only its name. A section line should read `.section .rodata {#1}` and usually does. Sometimes it arrives as `.section .rodata3, 0x69, 0x6F, 0x6E, 0x6B, 0x00,  {#1}`, with a fragment of the module's own compile chunk sitting in the middle of it, left in the assembler's log buffer. It is not every run and not every machine, which is the worst way for this to behave: the first version of this recorder copied that line as it stood, both committed tapes had four bytes of a compile chunk in them, and the run that caught it was a CI job on a third machine where the leftover bytes were not even valid text. So the name is taken up to the first character that cannot be in one and the rest of the line goes. There is a test that no row on a tape is anything but printable ASCII, which is the general form of the same rule.
+
 ### This one needs a release
 
 The mirror image of the disassembly tape. The interpreter has no JIT, `+JDdump true` on it writes nothing, and the recorder refuses rather than reading a file that was never created. So the two tapes cannot come off the same machine, and running the tests on either flavor leaves the other one's cases reported as skipped with the reason next to them.

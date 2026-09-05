@@ -56,6 +56,8 @@ cases() ->
         {"every function got its name from the dump", fun every_function_is_named/0},
         {"the only instructions that cost nothing are the ones that are not work", fun groups_have_code/0},
         {"every row belongs to a group that is on the tape", fun rows_belong/0},
+        {"nothing on the tape is anything but printable text", fun nothing_but_text/0},
+        {"the module has a code section and a constants section", fun the_sections/0},
         {"the JIT does not call addition what the interpreter calls it", fun a_different_name/0},
         {"an opcode name is a bare identifier and a note never is", fun names_against_notes/0},
         {"no machine address survives on the tape", fun no_addresses/0},
@@ -213,6 +215,31 @@ rows_belong() ->
         Owners = [F || {group, _, F, _, _} <- groups(Events)],
         Owned = [Index || {function, Index, _, _, _, _} <- functions(Events)],
         ?EQ("groups belonging to no function", [], lists:usort(Owners) -- ([0 | Owned]))
+    end).
+
+%% A dump is text about code. Anything on a tape that is not printable ASCII
+%% arrived from the module's own bytes rather than from the assembler's words,
+%% which is the thing this recorder exists to keep out.
+%%
+%% This is not hypothetical. A section marker sometimes arrives with a fragment
+%% of the module's metadata sitting in the middle of it, left in the assembler's
+%% log buffer, and copying that line as it stood put four bytes of a compile
+%% chunk on a committed tape. It is not every run and not every machine, so this
+%% case is the only thing between that and a tape nobody rereads.
+nothing_but_text() ->
+    with_recording(fun(_Header, Events, _Result) ->
+        Texts = [Text || Row <- Events, is_tuple(Row), Text <- [element(tuple_size(Row), Row)], is_binary(Text)],
+        Odd = [Text || Text <- Texts, Text =/= source(), re:run(Text, "[^\\x20-\\x7e]") =/= nomatch],
+        ?EQ("rows holding something that is not printable ASCII", [], Odd)
+    end).
+
+%% And the marker itself, which is the row that went wrong. There are two
+%% sections in a module, the code and the constants, and a third name here would
+%% mean the trimming had gone too far or not far enough.
+the_sections() ->
+    with_recording(fun(_Header, Events, _Result) ->
+        Found = lists:usort([Name || {section, _, Name} <- Events]),
+        ?EQ("the sections the module has", [<<".rodata">>, <<".text">>], Found)
     end).
 
 %% The reason both tapes exist. One beam file, one release, and the two flavors

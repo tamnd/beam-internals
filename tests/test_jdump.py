@@ -36,7 +36,8 @@ BODY = [
     '{native,2,<<"mov x14, addr(1)">>}.',
     '{native,2,<<"ret x30">>}.',
     '{data,2,<<".byte">>,24}.',
-    "{'$tape_end',10}.",
+    '{section,2,<<".rodata">>}.',
+    "{'$tape_end',11}.",
 ]
 
 
@@ -65,7 +66,7 @@ def test_rows_are_filed_under_the_instruction_that_emitted_them(tiny: Path) -> N
     tape = jdump.read(tiny)
     first, second = tape.groups
     assert [row.kind for row in first.rows] == ["label", "align"]
-    assert [row.kind for row in second.rows] == ["note", "native", "native", "data"]
+    assert [row.kind for row in second.rows] == ["note", "native", "native", "data", "section"]
 
 
 def test_the_census_counts_each_beam_instruction(tiny: Path) -> None:
@@ -94,6 +95,7 @@ def test_each_kind_of_row_is_shown_as_what_it_is(tiny: Path) -> None:
     assert "      # tiny:go/0" in shown
     assert "      mov x14, addr(1)" in shown
     assert "      .byte  24 bytes of data" in shown
+    assert "  .rodata" in shown
 
 
 def test_the_listing_puts_each_instruction_under_its_function(tiny: Path) -> None:
@@ -165,6 +167,23 @@ def test_no_address_survived_on_either_tape(pair: list[jdump.Tape]) -> None:
             for row in group.rows:
                 if row.kind == "native":
                     assert "0x" not in row.text
+
+
+def test_nothing_on_either_tape_is_anything_but_printable_text(pair: list[jdump.Tape]) -> None:
+    """A dump is text about code. Anything else on a tape came off the module's
+    own bytes, and the section markers are where that happened once: they used
+    to be copied whole, and the assembler sometimes leaves a fragment of the
+    compile chunk sitting in the middle of one."""
+    for one in pair:
+        for group in one.groups:
+            for row in group.rows:
+                assert row.text.isprintable(), f"{one.native}: {row.kind} row {row.text!r}"
+
+
+def test_the_only_sections_are_the_code_and_the_constants(pair: list[jdump.Tape]) -> None:
+    for one in pair:
+        found = {row.text for group in one.groups for row in group.rows if row.kind == "section"}
+        assert found == {".text", ".rodata"}
 
 
 def test_the_comparison_marks_an_absence_as_an_absence(pair: list[jdump.Tape]) -> None:

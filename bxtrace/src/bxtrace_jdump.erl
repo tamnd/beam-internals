@@ -44,6 +44,9 @@
 %% module's own metadata, which includes the full path of the source file it was
 %% compiled from, so copying them onto a tape would publish a directory off
 %% somebody's machine. What is kept is the label and the byte count.
+%%
+%% Those bytes turn up in one more place, which is the reason a section marker
+%% keeps only its name. See section_name/1.
 
 -module(bxtrace_jdump).
 
@@ -144,7 +147,7 @@ dump(Source, Module) ->
         Asm = filename:join(Dir, atom_to_list(Module) ++ ".asm"),
         case file:read_file(Asm) of
             {ok, Bytes} ->
-                Lines = [unicode:characters_to_list(L) || L <- binary:split(Bytes, <<"\n">>, [global])],
+                Lines = [binary_to_list(L) || L <- binary:split(Bytes, <<"\n">>, [global])],
                 {Lines, length(filelib:wildcard("*.asm", Dir))};
             {error, Reason} ->
                 error({bxtrace_jdump, {no_dump_was_written, Asm, Reason}})
@@ -234,6 +237,7 @@ line(Raw, State) ->
         {native, Text} -> native_row(Text, State);
         {align, To} -> row({align, group(State), To}, State);
         {label, Text} -> row({label, group(State), list_to_binary(Text)}, State);
+        {section, Name} -> row({section, group(State), list_to_binary(Name)}, State);
         {data, Directive, Bytes} -> row({data, group(State), list_to_binary(Directive), Bytes}, State)
     end.
 
@@ -258,14 +262,36 @@ classify(Line) ->
 indented("align " ++ To) -> {align, list_to_integer(string:trim(To))};
 indented(Text) -> {native, Text}.
 
-%% A `.byte' run is counted, never copied. A `.section' marker is kept as it is,
-%% because it says which of the module's areas the bytes after it land in and it
-%% carries nothing machine specific.
+%% A `.byte' run is counted, never copied. A `.section' marker keeps its name and
+%% nothing else, because the name says which of the module's areas the bytes
+%% after it land in and the rest of that line cannot be trusted. See
+%% section_name/1.
 directive(Line) ->
-    case string:split(Line, " ") of
-        [".section", Rest] -> {label, ".section " ++ Rest};
-        [Directive, Rest] -> {data, Directive, count_bytes(Directive, Rest)};
-        [Directive] -> {data, Directive, 0}
+    case section_name(Line) of
+        {ok, Name} ->
+            {section, Name};
+        no ->
+            case string:split(Line, " ") of
+                [Directive, Rest] -> {data, Directive, count_bytes(Directive, Rest)};
+                [Directive] -> {data, Directive, 0}
+            end
+    end.
+
+%% The name and nothing after it, matched rather than split off.
+%%
+%% A section line should read `.section .rodata {#1}' and usually does. Sometimes
+%% it arrives with bytes from the line before it sitting in the middle of it,
+%% like `.section .rodata3, 0x69, 0x6F, 0x6E, 0x6B, 0x00,  {#1}', which is a
+%% fragment of the module's own metadata that the assembler's log buffer did not
+%% clear. It is not every run and not every machine, which is the worst kind of
+%% thing to copy onto a tape: it is data off the recording machine, it is not
+%% valid text, and it would sit there being reread by people until somebody
+%% noticed. So the name is taken up to the first character that cannot be in one
+%% and the rest of the line is dropped.
+section_name(Line) ->
+    case re:run(Line, "^\\.section +(\\.[A-Za-z_]+)", [{capture, all_but_first, list}]) of
+        {match, [Name]} -> {ok, Name};
+        nomatch -> no
     end.
 
 count_bytes(Directive, Rest) ->

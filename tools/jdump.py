@@ -116,7 +116,7 @@ def read(path: Path) -> Tape:
                 group = Group(term[1], term[2], text(term[3]), term[4])
                 groups.append(group)
                 by_index[group.index] = group
-            elif tag in ("native", "note", "label"):
+            elif tag in ("native", "note", "label", "section"):
                 at = by_index.get(term[1])
                 if at is not None:
                     at.rows.append(Row(tag, text(term[2])))
@@ -158,7 +158,8 @@ def show(row: Row) -> str:
     A note is the emitter talking to whoever reads the dump, so it keeps its
     hash. A run of bytes is shown as a size, because what is in it is the
     module's own metadata and none of it survives being moved to another
-    machine.
+    machine. A section marker sits at the outdent a label sits at, without the
+    colon, because it is not somewhere anything jumps to.
     """
     if row.kind == "native":
         return f"      {row.text}"
@@ -166,6 +167,8 @@ def show(row: Row) -> str:
         return f"      # {row.text}"
     if row.kind == "label":
         return f"    {row.text}:"
+    if row.kind == "section":
+        return f"  {row.text}"
     if row.kind == "align":
         return f"      pad to a {row.size} byte boundary"
     return f"      {row.text}  {row.size} byte{'' if row.size == 1 else 's'} of data"

@@ -105,8 +105,8 @@ recorded = "2026-09-05"
 by_whom = "tamnd"
 why = "the same module on AArch64, so the two can be put side by side"
 needed_by = ["m26"]
-bytes = 2711
-sha256 = "854705b29213403119c555bf7abc4117b7250b056d9c04a7ca34016e53e88451"
+bytes = 2683
+sha256 = "f1d13b972d09b8532ff93c670dccc60003369642975d2491670fe7ebbb8d3b8b"
 
 [[artefact]]
 path = "jdump/l1-x86_64.tape.gz"
@@ -120,8 +120,8 @@ recorded = "2026-09-05"
 by_whom = "tamnd"
 why = "what the JIT emitted for a six line module on x86-64"
 needed_by = ["m26"]
-bytes = 2852
-sha256 = "31e3dfe18134f4658b03d7826ddc8200f6b7ccadf99eabf57671d72e5aa50e2f"
+bytes = 2841
+sha256 = "1dfb137e550948db2c08fc39374f127584d9ce75b91cd63e1a0e096ddeec072b"
 
 [[artefact]]
 path = "traces/one-spinner.tape.gz"
