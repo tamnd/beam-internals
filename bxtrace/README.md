@@ -101,6 +101,55 @@ The workload's number holds to within eight reductions on each machine and start
 
 That covers the workload and not the other processes on the tape, which is the honest limit of what can be measured from outside a process. Getting a count per slice for everything needs a tracer written as a NIF, because that callback runs in the context of the traced process rather than in a collector of its own. The schema has room for it and it is not needed for the figure the reduction tape exists to draw.
 
+## The pass tape
+
+`bxtrace_pass:record/2` compiles a module and writes down what the compiler did to it.
+
+```erlang
+{ok, Result} = bxtrace_pass:record("corpora/passes/l1.tape.gz",
+                                   #{by_whom => "tamnd",
+                                     why     => "the 93 stages figure",
+                                     source  => "corpora/src/l1.erl",
+                                     stages  => [to_core, to_asm]}).
+```
+
+The figure it exists for: a six line module goes through 33 top level passes and 60 named sub passes on the way to a beam file, and the validator runs twice, before and after the back end, because the compiler does not trust its own peephole optimisers.
+
+```erlang
+{source,<<"l1">>,<<"-module(l1).\n-export([add/2, fib/1]).\n...">>}.
+{pass,1,remove_file,46,4536,0}.
+{pass,2,parse_module,11262,7912,0}.
+{pass,19,beam_ssa_opt,12994,15104,31}.
+{subpass,19,beam_ssa_opt,ssa_opt_live,39,15}.
+{subpass,19,beam_ssa_opt,ssa_opt_cse,14,10}.
+{stage,to_core,<<"l1.core">>,<<"module 'l1' ['add'/2,...">>}.
+{stage,to_asm,<<"l1.S">>,<<"{module, l1}.  %% version = 0\n...">>}.
+```
+
+A pass is `{pass, At, Name, Micros, Bytes, SubPasses}`. `At` is where it came in the pipeline, `Bytes` is how large the thing it handed on was, and `SubPasses` is how many distinct ones ran underneath it. A sub pass is `{subpass, At, Parent, Name, Micros, Runs}`, where `At` points back at the pass it belongs to.
+
+`Runs` is the one number `erlc +time` cannot show you. Sub passes run once per function rather than once per module, so on this three function module the 60 named sub passes account for 310 invocations, and `erlc` folds all of that into one line each before printing.
+
+### Reading the handler instead of the printout
+
+`erlc +time` prints the same timings, and parsing what it prints is the obvious way to record them. It loses things.
+
+The printed format is `~-30s` for a top level pass and `~-27s` for a sub pass, at `lib/compiler/src/compile.erl:1412@OTP-29.0.5` and `lib/compiler/src/compile.erl:1435@OTP-29.0.5`. A name longer than the field runs into the colon and a name longer still is cut off, and on a stock OTP 29 that already happens: `skip_outgoing_tail_extraction` prints as `skip_outgoing_tail_extracti`. Times arrive rounded to a millisecond, sizes to a tenth of a kilobyte, and the sub passes arrive already folded, so `Runs` is gone.
+
+None of that is necessary, because the printing is a handler and the handler can be replaced. The atom `time` expands to `{time, fun print_pass_times/2}` at `lib/compiler/src/compile.erl:1197@OTP-29.0.5`, and the tuple form is looked up and called at `lib/compiler/src/compile.erl:1319@OTP-29.0.5`. Passing our own function there gets the same data one step earlier: exact native time, exact bytes, whole names, and every invocation.
+
+The liberty is that the tuple form is not documented, only the bare atom is. So the recorder checks the shape on the way in and stops with a message naming what changed, and there is a test that does nothing but assert that shape. A release that moves it shows up as a failing test rather than as a strange tape three weeks later.
+
+One detail worth knowing if you write a handler of your own: it does not run in your process. The compiler spawns a worker to compile in, which is why `no_spawn_compiler_process` exists as an option, so the handler has to send rather than store.
+
+### Capturing the intermediate forms
+
+Each stopping point gets its own compile, because a compile can only stop once. These modules are small and the alternative is reaching inside the pipeline, which would make the tape a recording of our own cleverness rather than of the compiler.
+
+Which file a stopping point writes is not guessed at. `to_core` writes `l1.core` and `to_asm` writes `l1.S`, but `to_exp` writes `l1.abstr` under the same name `to_abstr` uses, `dexp` writes `l1.expand`, and `to_dis` writes a beam file as well as its listing. So the compile runs into an empty directory and whatever turns up in it is the answer, minus any beam file, because a beam file is the output rather than a stage on the way to it.
+
+A stage's text goes on the tape as one binary, so a two hundred line listing is one line of tape with its newlines escaped. That looks odd the first time and it is the rule the whole format rests on.
+
 ## Reading one
 
 ```erlang
