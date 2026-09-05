@@ -83,6 +83,7 @@ bxtrace/
   src/bxtrace_tape.erl   the format, one reader and one writer
   src/bxtrace_reds.erl   the reduction tape, every scheduling event of a run
   src/bxtrace_pass.erl   the pass tape, what the compiler did to a module
+  src/bxtrace_post.erl   the postmortem tape, a crash dump turned into an index
   test/                  the tests, run by test.escript
   test.escript           our own code, needs a release and nothing else
   tape.escript           what is on a tape, without drawing any of it

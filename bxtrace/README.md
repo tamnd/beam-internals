@@ -150,6 +150,64 @@ Which file a stopping point writes is not guessed at. `to_core` writes `l1.core`
 
 A stage's text goes on the tape as one binary, so a two hundred line listing is one line of tape with its newlines escaped. That looks odd the first time and it is the rule the whole format rests on.
 
+## The postmortem tape
+
+`bxtrace_post:record/2` reads a crash dump and writes the index that makes it navigable.
+
+```erlang
+{ok, Result} = bxtrace_post:record("corpora/dumps/out-of-memory.tape.gz",
+                                   #{by_whom => "tamnd",
+                                     why     => "the fourteen causes figure",
+                                     dump    => "corpora/dumps/out-of-memory.dump"}).
+```
+
+The dump this was written against is 1.78 MB, 58735 lines and 1167 sections. The honest description of reading one in a text editor is that you scroll until you give up. The tape is 100 KB and 18044 rows: one row naming each section, 16711 facts, 118 summaries of encoded memory, and 48 lines that are not facts.
+
+```erlang
+{section,149,proc,<<"<0.5.0>">>,11867,19}.
+{fact,149,<<"State">>,<<"Waiting">>}.
+{fact,149,<<"Spawned as">>,<<"erts_dirty_process_signal_handler:start/0">>}.
+{fact,149,<<"Reductions">>,<<"7">>}.
+{fact,149,<<"Program counter">>,<<"0x000000010365cfb0 (erts_dirty_process_signal_handler:msg_loop/0 + 80)">>}.
+{line,149,18,<<"arity = 0">>}.
+{section,1050,proc_heap,<<"<0.0.0>">>,17813,138}.
+{blob,1050,138,4027,<<"046a584bfd03080232bf75f6033eb597b63ea973fb1f359d0d86b271c54e5bcb">>}.
+```
+
+A section is `{section, At, Kind, Id, Line, Lines}`. `At` numbers the sections in file order and everything under a section points back at it, and `Line` is where that section starts in the dump, so a reader who wants the raw text knows where to look. The two are separate on purpose: one orders the tape and the other addresses the file.
+
+The tape is an index and not a replacement. The dump stays in `corpora/dumps` and the tape points into it.
+
+### Facts and blobs
+
+Most sections are a list of `Key: Value` lines and go on the tape as facts. The rest are encoded memory, one line per term or per slot, in a form written for a decoder rather than for a person. Those become one `{blob, At, Lines, Bytes, Digest}` row. The encoded heaps of forty three processes are most of the file and none of the reading.
+
+The digest is what makes a summary worth having. Two heaps of the same size are common and two heaps with the same contents are not, so a blob row carrying only a line count and a byte count would report a match that is not there.
+
+Which sections are which is a list in the source rather than a guess about the contents. The keys are the binaries the file used and are never turned into atoms, because reading a file nobody in this repository wrote and putting its words in the atom table fills the one table with no way to take anything back out.
+
+Nothing is dropped either way. A line in a fact section that is not shaped like a fact goes on the tape as `{line, At, N, Text}`, and a stock dump has 48 of those: 42 `arity = 0` lines that follow a program counter, 5 stack trace lines under the scheduler that was running, and the date on the first line of the header. There is a test whose whole job is to add up the fact rows and the line rows of every section and check they account for its lines exactly.
+
+### Where the section list comes from
+
+A crash dump is a flat list of sections. A section starts with a line whose first character is `=`, and the rest of that line is a tag, then optionally a colon and an id. That is the entire structure, and it is the same split `crashdump_viewer` does one character at a time at `lib/observer/src/crashdump_viewer.erl:1007@OTP-29.0.5`.
+
+The tags are a fixed list, written out as macros at `lib/observer/src/crashdump_viewer.erl:127@OTP-29.0.5` so that a misspelling in the viewer is a compile error rather than a section it quietly skips. Two of them are spelled differently there than in the file, because `end` and `fun` are reserved words, so the viewer calls them `ende` and `fu`. This recorder keeps the names the file uses and writes them as the quoted atoms `'end'` and `'fun'`, which read back through `erl_parse` like any other atom.
+
+A tag not on the list still goes on the tape, as a binary rather than an atom, and the header counts it under `unknown_kinds`. A test asserts that list is empty for a stock dump, which is how a release that adds a section shows up as a failing test rather than as a tape with one row spelled oddly.
+
+### Truncated dumps
+
+A dump ends with `=end`. Anything else means the node died while writing it, or the disk filled, or somebody copied the file while it was still being written.
+
+The recorder reads it anyway and says so in the header as `complete => false`. Most real crash dumps are truncated, because whatever killed the node often gets around to killing the write as well, and a recorder that refused them would refuse the dumps people actually turn up with.
+
+### What the dump says about itself against what the machine says
+
+The header has two halves. The usual fields describe the machine that read the dump. A `dumped` map holds what the dump says about the node that wrote it: the format version, the time, the slogan, the system version, the atom count and which thread was running.
+
+Keeping them apart matters because a dump copied off another machine is the normal case rather than the odd one. Merging the two would produce a tape claiming a dead node's heap was measured in the reading node's word size.
+
 ## Reading one
 
 ```erlang
