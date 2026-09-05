@@ -86,6 +86,17 @@ conformance *suites:
 conformance-list:
     ./conformance/run.escript --list
 
+# The tests for the tape recorders. Also needs a release and nothing else. Kept
+# apart from `conformance` because a failure here is news about our code and a
+# failure there is news about Erlang.
+bxtrace-test *modules:
+    ./bxtrace/test.escript {{ modules }}
+
+# What is on a tape, without drawing any of it. Header, provenance, and a count
+# per event tag.
+tape +paths:
+    ./bxtrace/tape.escript {{ paths }}
+
 # Render one animation and its still. The still lands where the scene file says
 # it belongs, which is next to the lesson that shows it. Needs the anim extra,
 # which is not installed by `just setup` because Manim is large and no gate

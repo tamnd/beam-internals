@@ -74,6 +74,20 @@ The interpreter output has to be in here because a stock release build ships onl
 
 An OTP application, installable on its own with rebar3, with no dependency on Livebook or on anything else in this repository. One rule: it never tells you anything the BEAM would not tell you itself. It formats, correlates and renders. `bxray:source/1` prints the underlying call for any function it offers, so you can drop the library and keep working.
 
+## bxtrace
+
+The tape recorders, and the format they record into.
+
+```
+bxtrace/
+  src/bxtrace_tape.erl   the format, one reader and one writer
+  test/                  the tests, run by test.escript
+  test.escript           our own code, needs a release and nothing else
+  tape.escript           what is on a tape, without drawing any of it
+```
+
+A tape is gzipped text, one Erlang term per line, with a header carrying the build it came from and a footer carrying the event count. Text so it can be diffed across a pin bump, one term per line so a reader does not have to parse the whole thing, and a count at the end so a recorder that was killed halfway leaves a file that fails to read rather than one that reads short. `bxtrace/README.md` has the format and the rule about what may go on a tape.
+
 ## tools
 
 Small programs, standard library only wherever possible, so they run in seconds and so a prose change gets an answer before the coffee is poured.
