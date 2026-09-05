@@ -53,10 +53,20 @@ deterministic = [
   "boss",
 ]
 
-# Cells that are run so that one which stops compiling is caught, and whose
-# output is not compared against anything. The banner prints the build in front
-# of you, which is different on every machine and is the point of printing it.
-not_compared = ["banner"]
+# Nothing here is run without being compared.
+not_compared = []
+
+# The banner prints the build in front of you, and the emulator's build line
+# carries this machine's scheduler counts and whichever optional features it was
+# built with. Erase that and what is left is the release, the erts version and
+# the word size.
+#
+# The `nodes` filter is deliberately not here. This lesson decodes a pid for the
+# node `a@b` out of a binary literal and prints the node name it got, so a
+# filter that erased the host half of a node name would erase the answer to the
+# question the cell is asking. Filters are named per cell for this reason.
+[bake.normalised]
+banner = ["build-flags"]
 
 [verified]
 # Both architectures, both on the pinned release. Verified by `just bake`, which

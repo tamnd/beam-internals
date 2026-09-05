@@ -48,9 +48,15 @@ deterministic = [
   "boss",
 ]
 
-# The banner prints the build you are sitting on, so it is run to check it does
-# not crash and its output is not compared.
-not_compared = ["banner"]
+# Nothing here is run without being compared.
+not_compared = []
+
+# The banner prints the build you are sitting on, and the emulator's build line
+# carries this machine's scheduler counts and whichever optional features it was
+# built with. Erase that and what is left is the release, the erts version and
+# the word size, which is what the lesson is pinned to.
+[bake.normalised]
+banner = ["build-flags"]
 
 [verified]
 # Both architectures, both on the pinned release. Verified by `just bake`, which

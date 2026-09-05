@@ -107,6 +107,7 @@ Small programs, standard library only wherever possible, so they run in seconds 
 | `corpus` | Every recording has provenance, the provenance matches the bytes on disk, and a tape agrees with the entry that describes it. |
 | `erlterm` | Reads an Erlang term in Python, which is how a tape header gets compared against the manifest. |
 | `bake` | Runs every cell of every lesson the way Livebook runs them, and compares what came out against `expected/`. |
+| `normalise` | Erases the pids, ports, references, durations, paths and node names that stop a cell's output from being compared. |
 | `drift` | Watches upstream and opens issues. Never edits content. |
 
 ## site

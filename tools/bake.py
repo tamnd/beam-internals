@@ -11,16 +11,27 @@ recording, and the output shown to a reader inside the lesson matches that
 recording. The running half needs a release on the path and is the part that
 finds out whether any of it is still true.
 
-Not every cell can be compared. A banner prints the build in front of you and a
-timing cell prints wall clock times, so `meta.toml` splits the cells into the
-ones whose output is the same everywhere and the ones that are run only to catch
-the day one of them stops compiling.
+Not every cell can be compared as it stands. A banner prints the build in front
+of you and a timing cell prints wall clock times, so `meta.toml` sorts the cells
+into three:
+
+  deterministic   the output is the same everywhere, compared byte for byte
+  normalised      the output is the same once the noise is filtered out
+  not_compared    run so that one which stops compiling is caught, nothing more
+
+The middle one is where most of the interesting cells end up. A cell that prints
+a pid, a port, a reference, a duration, a path or a node name prints something
+different every time and is still saying the same thing, so `tools/normalise`
+erases those shapes and the recording holds the filtered form. The filters are
+named per cell, because the shape that is noise in one lesson is the answer in
+the next.
 
 Run:
   python3 -m tools.bake              every lesson, run and compare
   python3 -m tools.bake t07 m02      only these
   python3 -m tools.bake --offline    the half that needs no Erlang
   python3 -m tools.bake --write      run and rewrite the recordings
+  python3 -m tools.normalise         what the filters are
 """
 
 from __future__ import annotations
@@ -33,6 +44,8 @@ import tempfile
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
+
+from tools.normalise import FILTERS, Unknown, normalise
 
 LESSONS = Path("lessons")
 RUNNER = Path("tools/bake.exs")
@@ -148,16 +161,46 @@ def lessons(wanted: list[str]) -> list[Path]:
     return [by_id[name] for name in wanted]
 
 
+@dataclass
+class Plan:
+    """What `meta.toml` says should happen to each cell's output."""
+
+    deterministic: list[str]
+    normalised: dict[str, list[str]]
+    not_compared: list[str]
+
+    @property
+    def compared(self) -> set[str]:
+        return set(self.deterministic) | set(self.normalised)
+
+    @property
+    def listed(self) -> set[str]:
+        return self.compared | set(self.not_compared)
+
+    def recorded(self, name: str, text: str) -> str:
+        """What goes in `expected/`, which for a normalised cell is the filtered form."""
+        return normalise(text, self.normalised.get(name, []))
+
+
+def plan(lesson: Path) -> Plan:
+    meta = tomllib.loads((lesson / "meta.toml").read_text(encoding="utf-8"))
+    if "bake" not in meta:
+        raise Broken(f"{lesson.name}: meta.toml has no [bake] section, so nothing knows what to compare")
+    bake = meta["bake"]
+    return Plan(
+        deterministic=bake.get("deterministic", []),
+        normalised=bake.get("normalised", {}),
+        not_compared=bake.get("not_compared", []),
+    )
+
+
 def bookkeeping(lesson: Path, cells: list[Cell]) -> list[str]:
     """Everything that can be checked without running a single line of Elixir."""
     problems: list[str] = []
-    meta = tomllib.loads((lesson / "meta.toml").read_text(encoding="utf-8"))
-    bake = meta.get("bake")
-    if bake is None:
-        return [f"{lesson.name}: meta.toml has no [bake] section, so nothing knows what to compare"]
-
-    deterministic = bake.get("deterministic", [])
-    not_compared = bake.get("not_compared", [])
+    try:
+        sorted_into = plan(lesson)
+    except Broken as problem:
+        return [str(problem)]
 
     seen: set[str] = set()
     for cell in cells:
@@ -165,30 +208,77 @@ def bookkeeping(lesson: Path, cells: list[Cell]) -> list[str]:
             problems.append(f"{lesson.name}: two cells called {cell.name}, so one recording has two owners")
         seen.add(cell.name)
 
-    both = set(deterministic) & set(not_compared)
-    for name in sorted(both):
-        problems.append(f"{lesson.name}: {name} is listed as deterministic and as not compared")
+    lists = [
+        ("deterministic", set(sorted_into.deterministic)),
+        ("normalised", set(sorted_into.normalised)),
+        ("not compared", set(sorted_into.not_compared)),
+    ]
+    for index, (name, names) in enumerate(lists):
+        for other, others in lists[index + 1 :]:
+            for both in sorted(names & others):
+                problems.append(f"{lesson.name}: {both} is listed as {name} and as {other}")
 
-    listed = set(deterministic) | set(not_compared)
-    for name in sorted(seen - listed):
-        problems.append(f"{lesson.name}: cell {name} is in the notebook and in neither list in meta.toml")
-    for name in sorted(listed - seen):
+    for name in sorted(seen - sorted_into.listed):
+        problems.append(f"{lesson.name}: cell {name} is in the notebook and in no list in meta.toml")
+    for name in sorted(sorted_into.listed - seen):
         problems.append(f"{lesson.name}: meta.toml lists {name} and the notebook has no such cell")
 
+    # A filter that does not exist is a typo, and a typo in a filter name would
+    # otherwise pass silently as a cell nobody normalises. A cell that has one is
+    # left out of everything below, because there is no honest way to filter its
+    # output until somebody fixes the name.
+    misspelt: set[str] = set()
+    for name, wanted in sorted(sorted_into.normalised.items()):
+        for filter_name in wanted:
+            if filter_name not in FILTERS:
+                misspelt.add(name)
+                problems.append(
+                    f"{lesson.name}: {name} asks for a filter called {filter_name}, "
+                    f"and there is no such filter. There are {', '.join(sorted(FILTERS))}"
+                )
+
     recordings = {p.stem for p in (lesson / "expected").glob("*.txt")}
-    for name in sorted(set(deterministic) - recordings):
-        problems.append(f"{lesson.name}: {name} is deterministic and has no expected/{name}.txt")
-    for name in sorted(recordings - set(deterministic)):
-        problems.append(f"{lesson.name}: expected/{name}.txt belongs to no deterministic cell")
+    for name in sorted(sorted_into.compared - recordings):
+        problems.append(f"{lesson.name}: {name} is compared and has no expected/{name}.txt")
+    for name in sorted(recordings - sorted_into.compared):
+        problems.append(f"{lesson.name}: expected/{name}.txt belongs to no cell that is compared")
+
+    # A filter named for a cell it does nothing to is a filter somebody copied
+    # from another lesson. It lies about why the cell is in the normalised list,
+    # and the cost is that a reader of `meta.toml` learns something untrue about
+    # the output.
+    #
+    # Asking whether it fired means looking for the mark it leaves, because the
+    # recording is the filtered form and the noise it erased is long gone by the
+    # time anybody reads it. That also keeps this checkable with no Erlang on the
+    # machine, which is the whole point of the offline half.
+    for name, wanted in sorted(sorted_into.normalised.items()):
+        recording = lesson / "expected" / f"{name}.txt"
+        if name in misspelt or not recording.exists():
+            continue
+        text = recording.read_text(encoding="utf-8")
+        for filter_name in wanted:
+            if filter_name in FILTERS and FILTERS[filter_name].mark not in text:
+                problems.append(
+                    f"{lesson.name}: {name} asks for the {filter_name} filter and "
+                    f"there is nothing in its output for that filter to erase"
+                )
 
     # The lesson prints the output under most cells so it can be read on a train.
     # If that printed copy and the recording disagree then one of the two is
-    # lying to somebody, and the reader is the one who cannot tell.
+    # lying to somebody, and the reader is the one who cannot tell. For a
+    # normalised cell the printed copy is the raw output from a real machine,
+    # because a reader wants to see a duration rather than the word TIME, so the
+    # two are compared through the filters.
     for cell in cells:
-        if cell.name not in deterministic or cell.shown is None:
+        if cell.name not in sorted_into.compared or cell.shown is None:
+            continue
+        if cell.name in misspelt:
             continue
         recording = lesson / "expected" / f"{cell.name}.txt"
-        if recording.exists() and recording.read_text(encoding="utf-8") != cell.shown:
+        if not recording.exists():
+            continue
+        if recording.read_text(encoding="utf-8") != sorted_into.recorded(cell.name, cell.shown):
             problems.append(
                 f"{lesson.name}: the output printed under {cell.name} in the lesson "
                 f"is not what expected/{cell.name}.txt records"
@@ -231,14 +321,13 @@ def difference(name: str, recorded: str, got: str) -> str:
 
 
 def compare(lesson: Path, cells: list[Cell], output: dict[str, str]) -> list[str]:
-    meta = tomllib.loads((lesson / "meta.toml").read_text(encoding="utf-8"))
-    deterministic = meta["bake"]["deterministic"]
+    sorted_into = plan(lesson)
     problems: list[str] = []
 
     for cell in cells:
-        if cell.name not in deterministic:
+        if cell.name not in sorted_into.compared:
             continue
-        got = output[cell.name]
+        got = sorted_into.recorded(cell.name, output[cell.name])
         recording = lesson / "expected" / f"{cell.name}.txt"
         recorded = recording.read_text(encoding="utf-8")
         if got != recorded:
@@ -250,10 +339,7 @@ def compare(lesson: Path, cells: list[Cell], output: dict[str, str]) -> list[str
 
 def write(lesson: Path, cells: list[Cell], output: dict[str, str]) -> list[str]:
     """Rewrite the recordings, and the copy the lesson shows, from this run."""
-    meta = tomllib.loads((lesson / "meta.toml").read_text(encoding="utf-8"))
-    if "bake" not in meta:
-        raise Broken(f"{lesson.name}: meta.toml has no [bake] section, so there is nothing to write")
-    deterministic = meta["bake"]["deterministic"]
+    sorted_into = plan(lesson)
     changed: list[str] = []
 
     notebook = lesson / "lesson.livemd"
@@ -262,20 +348,24 @@ def write(lesson: Path, cells: list[Cell], output: dict[str, str]) -> list[str]:
     # Backwards, so that replacing one block does not move the line numbers of
     # the blocks that have not been replaced yet.
     for cell in reversed(cells):
-        if cell.name not in deterministic:
+        if cell.name not in sorted_into.compared:
             continue
         got = output[cell.name]
 
+        # The recording holds the filtered form and the lesson holds the raw
+        # form, so a reader sees what a machine really printed and CI compares
+        # the part of it that does not move.
         recording = lesson / "expected" / f"{cell.name}.txt"
-        if not recording.exists() or recording.read_text(encoding="utf-8") != got:
-            recording.write_text(got, encoding="utf-8")
+        fresh = sorted_into.recorded(cell.name, got)
+        if not recording.exists() or recording.read_text(encoding="utf-8") != fresh:
+            recording.write_text(fresh, encoding="utf-8")
             changed.append(f"{lesson.name}: rewrote expected/{cell.name}.txt")
 
         if cell.span is not None:
             start, close = cell.span
-            fresh = got.rstrip("\n").split("\n")
-            if lines[start:close] != fresh:
-                lines[start:close] = fresh
+            shown = got.rstrip("\n").split("\n")
+            if lines[start:close] != shown:
+                lines[start:close] = shown
                 changed.append(f"{lesson.name}: rewrote the output shown under {cell.name}")
 
     notebook.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -339,7 +429,7 @@ def main() -> int:
 
         try:
             notes.extend(write(lesson, cells, output))
-        except Broken as problem:
+        except (Broken, Unknown) as problem:
             problems.append(f"bake: {problem}")
             continue
 

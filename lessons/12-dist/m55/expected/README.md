@@ -2,11 +2,11 @@
 
 One file per cell, named after the `<!-- cell: name -->` marker above it in `lesson.livemd`. They were produced by pulling each fenced cell out of the notebook, running the whole set in order inside one VM, and keeping what came out. The recordings are the notebook's own code and not a retyped copy of it, which matters more here than it did in m02 because several of these cells depend on the ones before them.
 
-Ten cells are recorded and one is not. The split lives in `meta.toml` under `[bake]` so a tool can act on it.
+All eleven cells are recorded. How each one is compared lives in `meta.toml` under `[bake]` so a tool can act on it.
 
-The ten are byte for byte identical on aarch64 macOS and on x86-64 Linux, both Erlang/OTP 29 erts-17.0.5 with Elixir 1.20.4, with the same extraction script run on both sides. A number that moves between machines cannot be a regression test, so that check is the reason these files are worth committing.
+Ten of the eleven are byte for byte identical on aarch64 macOS and on x86-64 Linux, both Erlang/OTP 29 erts-17.0.5 with Elixir 1.20.4, with the same extraction script run on both sides. A number that moves between machines cannot be a regression test, so that check is the reason these files are worth committing.
 
-The one that is not recorded is `banner`, which prints the OTP build in front of you. It still runs, so a cell that stops compiling is caught, and comparing a build string against a stored file would fail for every reader who is not on the machine this was written on.
+`banner.txt` is recorded through the filters in `tools/normalise`, because the build line the emulator prints carries this machine's scheduler counts and whichever optional features it was built with. Those are erased and the release, the erts version and the word size are kept, so the file says nothing about who ran it and still fails loudly on the wrong OTP release.
 
 Two of these files need a word of warning.
 
