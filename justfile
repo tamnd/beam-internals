@@ -7,7 +7,7 @@ set shell := ["bash", "-uc"]
 # The full set, same order as ci.yml
 default: check
 
-check: prose ledger blueprints bpc-check citations bake-offline site-check
+check: prose ledger blueprints bpc-check citations corpus bake-offline site-check
     @echo "all checks passed"
 
 # House style. Catches the em dash, the banned words, sentences wrapped across
@@ -31,6 +31,11 @@ bpc:
 # Same, but compares instead of writing, so a hand edited region fails.
 bpc-check:
     python3 -m tools.bpc --check
+
+# Every artefact in corpora has provenance, the provenance matches the bytes on
+# disk, and a tape agrees with the manifest row that claims to describe it.
+corpus:
+    python3 -m tools.corpus
 
 # Citation shape, and resolution when the pinned tree is checked out.
 citations:
@@ -91,6 +96,11 @@ conformance-list:
 # failure there is news about Erlang.
 bxtrace-test *modules:
     ./bxtrace/test.escript {{ modules }}
+
+# Make one of the recordings that go in corpora, and print the manifest entry
+# to paste next to it. `just record --list` says what there is.
+record *names:
+    ./bxtrace/record.escript {{ names }}
 
 # What is on a tape, without drawing any of it. Header, provenance, and a count
 # per event tag.

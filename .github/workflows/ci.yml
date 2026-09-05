@@ -52,6 +52,13 @@ jobs:
       - name: Citations resolve and match the pin
         run: python -m tools.refcheck
 
+      # Provenance for the recordings. Every artefact has an entry, every entry
+      # has bytes behind it, and a tape agrees with the manifest row that claims
+      # to describe it. This needs no Erlang because the tape header is read
+      # rather than replayed.
+      - name: Corpus manifest
+        run: python -m tools.corpus
+
       # The half of the baker that needs no Erlang. Every elixir cell is
       # accounted for in its meta.toml, every deterministic cell has a
       # recording, and the output printed inside a lesson is the recording

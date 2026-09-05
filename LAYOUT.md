@@ -87,6 +87,7 @@ bxtrace/
   test/                  the tests, run by test.escript
   test.escript           our own code, needs a release and nothing else
   tape.escript           what is on a tape, without drawing any of it
+  record.escript         makes a corpus recording and prints its manifest entry
 ```
 
 A tape is gzipped text, one Erlang term per line, with a header carrying the build it came from and a footer carrying the event count. Text so it can be diffed across a pin bump, one term per line so a reader does not have to parse the whole thing, and a count at the end so a recorder that was killed halfway leaves a file that fails to read rather than one that reads short. `bxtrace/README.md` has the format and the rule about what may go on a tape.
@@ -102,6 +103,8 @@ Small programs, standard library only wherever possible, so they run in seconds 
 | `ledger` | Every claim has an entry, every entry has evidence of the class it declares, and the per lesson caps hold. |
 | `bpc` | Generates blueprint sections from the VM's own tables and fails the build if a generated section was hand edited. |
 | `bplint` | The nine sections, the field classifications, and the rule about not referencing the chapter. |
+| `corpus` | Every recording has provenance, the provenance matches the bytes on disk, and a tape agrees with the entry that describes it. |
+| `erlterm` | Reads an Erlang term in Python, which is how a tape header gets compared against the manifest. |
 | `bake` | Runs every cell of every lesson the way Livebook runs them, and compares what came out against `expected/`. |
 | `drift` | Watches upstream and opens issues. Never edits content. |
 

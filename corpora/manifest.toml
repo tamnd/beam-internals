@@ -9,26 +9,77 @@
 # `arch` because the JIT output is a different instruction set on each. `build`
 # because two OTP 29.0.5 builds with different configure flags do not produce
 # the same disassembly.
+#
+# Entries are printed by the thing that made the file, not typed. Run
+# `./bxtrace/record.escript --list` to see what there is, run one, and paste
+# what it prints. `python3 -m tools.corpus` then checks that what is pasted
+# matches the bytes on disk and, for a tape, matches what the tape says about
+# itself in its own header.
 
 [defaults]
 tag = "OTP-29.0.5"
 erts = "17.0.5"
 
 # Every artefact declares these, and the defaults above fill in the common case.
-# required: path, produced_by, flavor, arch, os, build, recorded, by_whom, why
 #
 # path        where it lives, relative to corpora/
 # produced_by the exact command, runnable, not a description of one
+# kind        what sort of recording it is, and for a tape it has to be the
+#             kind the tape's own header says
 # flavor      emu or jit, because a stock release build ships jit only
 # arch        x86_64 or aarch64
-# os          the operating system and version the recorder ran on
-# build       how the emulator was configured, or `release` for a stock install
-# recorded    the date a person ran it
+# os          the operating system and its version
+# build       what the emulator says its build type is, `opt` for a stock one
+# recorded    the day a person ran it
 # by_whom     who ran it, so there is somebody to ask
-# why         which lesson or blueprint needs this, so a stale corpus can be
-#             found and deleted rather than kept because nobody is sure
+# why         one sentence on what this is for
+# needed_by   the lessons and blueprints that are graded against it, so a stale
+#             corpus can be found and deleted rather than kept because nobody
+#             is sure
+# bytes       the size, so a truncated copy is caught
+# sha256      the contents, so a swapped copy is caught
 
-# Nothing is recorded yet. The first entries land with M1, when the tape
-# recorders in bxtrace/ exist and there is a pinned build to record from. Until
-# then this file is the schema and the reason for it.
-artefact = []
+[[artefact]]
+path = "passes/l1.tape.gz"
+produced_by = "./bxtrace/record.escript l1-passes"
+kind = "pass"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the figure that a six line module runs 33 passes and 60 sub passes"
+needed_by = ["m12"]
+bytes = 2714
+sha256 = "872d2470e1d3d69b2e154f4f0d2175094815346230294143b9055ac7ec8b98a7"
+
+[[artefact]]
+path = "traces/one-spinner.tape.gz"
+produced_by = "./bxtrace/record.escript one-spinner"
+kind = "reds"
+flavor = "jit"
+arch = "aarch64"
+os = "darwin 24.6.0"
+build = "opt"
+recorded = "2026-09-05"
+by_whom = "tamnd"
+why = "the opening figure for t07, one process spending one budget at a time"
+needed_by = ["t07"]
+bytes = 1135
+sha256 = "ee9f9c218eb441780ffc91ba1a284ec558e2b1126b42d13056cc3d65f00eeccb"
+
+# The inputs the recordings were made from. These are written by hand rather
+# than recorded, so provenance for them is just what they are for and what came
+# out of them. `used_by` is what makes a source that nothing is recorded from
+# show up as a problem instead of sitting here forever.
+
+[[source]]
+path = "src/l1.erl"
+why = "the smallest module that still runs the whole compiler pipeline"
+used_by = ["passes/l1.tape.gz"]
+
+[[source]]
+path = "src/spinner.erl"
+why = "a loop whose reduction cost can be worked out on paper"
+used_by = ["traces/one-spinner.tape.gz"]
