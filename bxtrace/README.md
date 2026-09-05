@@ -45,7 +45,7 @@ Every fact a machine can state about itself is filled in by `bxtrace_tape:header
 | field | why it is there |
 | --- | --- |
 | `schema` | A reader meeting a tape from the future says so rather than guessing. |
-| `kind` | `reds`, `pass`, `dis` or `postmortem`. |
+| `kind` | `reds`, `pass`, `dis`, `jdump` or `postmortem`. |
 | `recorded`, `by_whom`, `why` | Provenance. The same rule `corpora/manifest.toml` states. |
 | `otp`, `erts`, `build` | Two builds of the same release do not behave the same. |
 | `arch`, `wordsize` | Heap words are a different number of bytes on each. |
@@ -211,6 +211,50 @@ The recorder refuses on the JIT rather than writing an empty tape, and says why.
 
 `df/1` is a loop over `erts_debug:disassemble/1` that throws away everything except the printed line, at `lib/kernel/src/erts_debug.erl:436@OTP-29.0.5`. The BIF hands back the address of the next instruction and the MFA the current one belongs to, and both are gone by the time the text reaches the file. Calling it directly keeps them, which is where every instruction's size and every function boundary comes from without parsing anything back out.
 
+## The native code tape
+
+`bxtrace_jdump:record/2` compiles a module, loads it in a child node with the dump flag on, and writes down what the JIT made of it.
+
+```erlang
+{ok, Result} = bxtrace_jdump:record("corpora/jdump/l1-aarch64.tape.gz",
+                                    #{by_whom => "tamnd",
+                                      why     => "what the JIT emitted for six lines",
+                                      source  => "corpora/src/l1.erl"}).
+```
+
+A group is `{group, At, Function, Op, Natives}`, one per BEAM instruction, in the order the assembler emitted them. Under each group are the lines it produced: `{native, Group, Text}` for an instruction, `{note, Group, Text}` for something the emitter wanted a reader to know, `{label, Group, Text}`, `{align, Group, To}` for padding, and `{data, Group, Directive, Bytes}` for a run of bytes.
+
+```erlang
+{group,8,1,<<"i_plus_jIssd">>,10}.
+{native,8,<<"and x8, x26, -16">>}.
+{native,8,<<"adds x0, x25, x8">>}.
+{native,8,<<"and x8, x25, x26">>}.
+{native,8,<<"and x8, x8, 15">>}.
+{note,8,<<"test for not overflow and small operands">>}.
+```
+
+The grouping is not guessed at. The assembler is asked to log the name of the BEAM instruction before emitting the code for it, at `erts/emulator/beam/jit/arm/beam_asm_module.cpp:458@OTP-29.0.5`, so the dump arrives already divided the way it should be divided.
+
+The finding it exists for is the size of a group. `add(A, B) -> A + B` is one BEAM instruction on the interpreter, one entry in a table, one dispatch. Here it is ten native instructions, and reading them tells you why: four to test that both arguments are small integers and that the sum did not overflow, one branch past the slow path, and then three to set up a call into the runtime for the case where any of that failed. The fast path is inline and the general case is still a call, which is the whole trade the JIT is making.
+
+### Two architectures, one module
+
+The pair in `corpora/jdump/` is the same six lines recorded on x86-64 and on AArch64, and `python3 -m tools.jdump --compare` puts them side by side. Some of the differences are what you would expect from two instruction sets. One is not: the two machines do not agree on which BEAM instructions to run. `corpora/README.md` has the table and the citations.
+
+### Nothing on the tape is an address
+
+Same rule as the disassembly tape, and the dump needs it more. A stub jumping into the emulator's C code shows up as `mov x14, 4412950416`, and that is a different number every run on the same machine. Any operand at least four bytes wide is replaced by `addr(N)` against a table kept only while recording, so two stubs going to the same place still look the same and neither shows a number that means anything elsewhere. The header says how many distinct ones there were, and a tape reporting none would mean the replacing had stopped working rather than that the dump was clean.
+
+Runs of bytes are counted rather than copied, for a second reason on top of that one. They hold the module's own metadata, which includes the full path of the file it was compiled from, so a tape that copied them would publish a directory off somebody's machine.
+
+Those bytes turn up in one more place, and finding it is the reason a section marker keeps only its name. A section line should read `.section .rodata {#1}` and usually does. Sometimes it arrives as `.section .rodata3, 0x69, 0x6F, 0x6E, 0x6B, 0x00,  {#1}`, with a fragment of the module's own compile chunk sitting in the middle of it, left in the assembler's log buffer. It is not every run and not every machine, which is the worst way for this to behave: the first version of this recorder copied that line as it stood, both committed tapes had four bytes of a compile chunk in them, and the run that caught it was a CI job on a third machine where the leftover bytes were not even valid text. So the name is taken up to the first character that cannot be in one and the rest of the line goes. There is a test that no row on a tape is anything but printable ASCII, which is the general form of the same rule.
+
+### This one needs a release
+
+The mirror image of the disassembly tape. The interpreter has no JIT, `+JDdump true` on it writes nothing, and the recorder refuses rather than reading a file that was never created. So the two tapes cannot come off the same machine, and running the tests on either flavor leaves the other one's cases reported as skipped with the reason next to them.
+
+It also needs both architectures, which is the part with no way around it. An x86-64 machine cannot produce the AArch64 tape, and that is exactly why the pair is committed.
+
 ## The postmortem tape
 
 `bxtrace_post:record/2` reads a crash dump and writes the index that makes it navigable.
@@ -310,5 +354,7 @@ just bxtrace-test bxtrace_tape one of them
 ```
 
 Most of the disassembly tests report as skipped, with the reason next to them and the count in the summary. They need an emulator built `--disable-jit` and you are almost certainly not sitting on one. A skipped case is not a passing case and the runner does not pretend otherwise.
+
+The native code tests are the other way round and skip on that build instead, so between the two suites every case runs somewhere and no machine runs all of them. They are also the slowest thing here, because a recording starts a whole node and that node compiles a hundred modules to native code before it gets to ours. One recording is made and handed to every case rather than one each, which is the difference between eleven seconds and two minutes.
 
 These are separate from the conformance suites because the two answer different questions. A conformance suite asks whether the runtime still behaves the way a blueprint says, and a failure there is news about Erlang. These ask whether our own code works, and a failure here is news about us. They do share an assertion vocabulary, because there is no reason for one repository to have two of those.

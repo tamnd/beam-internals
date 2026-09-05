@@ -93,6 +93,17 @@ filters:
 dis tape="corpora/dis/l1.tape.gz":
     python3 -m tools.dis {{ tape }}
 
+# A native code tape, printed as the BEAM instructions the loader chose with the
+# native instructions each one turned into underneath. Needs no runtime either.
+jdump tape="corpora/jdump/l1-x86_64.tape.gz":
+    python3 -m tools.jdump {{ tape }}
+
+# The same module on both architectures, side by side. This is the one to run:
+# the counts differ, and so do some of the BEAM instruction names, which is not
+# what you would expect from one beam file and one release.
+jdump-compare:
+    python3 -m tools.jdump --compare corpora/jdump/l1-x86_64.tape.gz corpora/jdump/l1-aarch64.tape.gz
+
 # The conformance suites, against whatever release is on the path. Needs an
 # Erlang release and nothing else, which is the whole design of the runner. Not
 # part of `check`, because `check` has to run on a machine with no Erlang.
