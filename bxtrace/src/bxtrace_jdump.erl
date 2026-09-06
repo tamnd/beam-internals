@@ -52,6 +52,11 @@
 
 -export([record/2, jit_check/0]).
 
+%% Exported for the test. A section marker that arrives with rubbish stuck to it
+%% happens on some runs and not others, so the trimming cannot be provoked
+%% through a recording and has to be called directly.
+-export([section_name/1]).
+
 %% An operand at least this wide is treated as opaque. Anything a compiler puts
 %% in the code as a real constant is far below it, and anything above it in a
 %% dump is a pointer into this process.
@@ -277,21 +282,40 @@ directive(Line) ->
             end
     end.
 
+%% The two sections the assembler emits for a module. The code goes in one and
+%% the constants the code reads go in the other, and there is no third.
+%%
+%% Written down as a list because a section marker cannot be trusted to end
+%% where it should. See section_name/1.
+-define(SECTIONS, [".rodata", ".text"]).
+
 %% The name and nothing after it, matched rather than split off.
 %%
 %% A section line should read `.section .rodata {#1}' and usually does. Sometimes
-%% it arrives with bytes from the line before it sitting in the middle of it,
-%% like `.section .rodata3, 0x69, 0x6F, 0x6E, 0x6B, 0x00,  {#1}', which is a
-%% fragment of the module's own metadata that the assembler's log buffer did not
-%% clear. It is not every run and not every machine, which is the worst kind of
-%% thing to copy onto a tape: it is data off the recording machine, it is not
-%% valid text, and it would sit there being reread by people until somebody
-%% noticed. So the name is taken up to the first character that cannot be in one
-%% and the rest of the line is dropped.
+%% it arrives with something from the line before it stuck on the end, and the
+%% something is not always the same shape. Once it was bytes of the module's own
+%% metadata, `.section .rodata3, 0x69, 0x6F, 0x6E, 0x6B, 0x00,  {#1}'. Once it
+%% was the tail of a label, `.section .rodataodeInfoPrologue', which reads as an
+%% ordinary name and is not one. Both are the assembler's log buffer handing
+%% over what it had not cleared.
+%%
+%% Trimming at the first character that cannot be in a name caught the first and
+%% not the second, because letters can be in a name. So the name is taken as the
+%% section it starts with, out of the two that exist. A marker that starts with
+%% neither is left as it arrived, which turns a new section name into a test
+%% failure that says what it found rather than a quiet truncation.
 section_name(Line) ->
-    case re:run(Line, "^\\.section +(\\.[A-Za-z_]+)", [{capture, all_but_first, list}]) of
-        {match, [Name]} -> {ok, Name};
+    case re:run(Line, "^\\.section +(\\.[A-Za-z_.]+)", [{capture, all_but_first, list}]) of
+        {match, [Name]} -> {ok, known(Name, ?SECTIONS)};
         nomatch -> no
+    end.
+
+known(Name, []) ->
+    Name;
+known(Name, [Section | Rest]) ->
+    case lists:prefix(Section, Name) of
+        true -> Section;
+        false -> known(Name, Rest)
     end.
 
 count_bytes(Directive, Rest) ->
