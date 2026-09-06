@@ -58,6 +58,7 @@ cases() ->
         {"every row belongs to a group that is on the tape", fun rows_belong/0},
         {"nothing on the tape is anything but printable text", fun nothing_but_text/0},
         {"the module has a code section and a constants section", fun the_sections/0},
+        {"a section marker with rubbish stuck to it keeps its name", fun trimmed_markers/0},
         {"the JIT does not call addition what the interpreter calls it", fun a_different_name/0},
         {"an opcode name is a bare identifier and a note never is", fun names_against_notes/0},
         {"no machine address survives on the tape", fun no_addresses/0},
@@ -241,6 +242,26 @@ the_sections() ->
         Found = lists:usort([Name || {section, _, Name} <- Events]),
         ?EQ("the sections the module has", [<<".rodata">>, <<".text">>], Found)
     end).
+
+%% The trimming itself, called directly, because it cannot be provoked. The
+%% rubbish comes from the assembler's log buffer, it is there on some runs and
+%% not others, and the two shapes below are the two that have actually turned up
+%% on a CI machine. The second one is why matching a name and stopping at the
+%% first character that cannot be in one was not enough: the tail of a label is
+%% letters, and letters can be in a name.
+trimmed_markers() ->
+    Markers = [
+        ".section .text {#1}",
+        ".section .rodata {#1}",
+        ".section .rodata3, 0x69, 0x6F, 0x6E, 0x6B, 0x00,  {#1}",
+        ".section .rodataodeInfoPrologue",
+        ".section .gcc_except_table {#1}"
+    ],
+    ?EQ(
+        "the name each marker leaves behind",
+        [{ok, ".text"}, {ok, ".rodata"}, {ok, ".rodata"}, {ok, ".rodata"}, {ok, ".gcc_except_table"}],
+        [bxtrace_jdump:section_name(Marker) || Marker <- Markers]
+    ).
 
 %% The reason both tapes exist. One beam file, one release, and the two flavors
 %% do not run the same instruction. The exact name here is architecture
