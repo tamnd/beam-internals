@@ -1,0 +1,11 @@
+what you wrote      kind        the variable itself
+42                  integer     is the whole value
+:foo                atom        is the whole value
+self()              pid         is the whole value
+[]                  list        is the whole value
+3.14                float       is an address, and 2 words sit at the other end
+[1, 2]              list        is an address, and 4 words sit at the other end
+{:a, :b}            tuple       is an address, and 3 words sit at the other end
+%{a: 1}             map         is an address, and 6 words sit at the other end
+<<1, 2, 3>>         bitstring   is an address, and 8 words sit at the other end
+Bitwise.bsl(1, 59)  integer     is an address, and 2 words sit at the other end

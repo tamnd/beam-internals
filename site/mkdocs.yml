@@ -66,6 +66,7 @@ nav:
   - Contributing: contributing.md
   - Blueprint notation: notation.md
   - Lessons:
+      - t01: lessons/t01/index.md
       - t07: lessons/t07/index.md
       - m02: lessons/m02/index.md
       - m55: lessons/m55/index.md

@@ -1,0 +1,12 @@
+on a 64 bit build
+
+:ok twice       you said false the VM says true  not this time
+1000 twice      you said false the VM says true  not this time
+[:ok] twice     you said false the VM says false correct
+self() twice    you said false the VM says true  not this time
+
+Not all of them.
+For each pair, ask first whether the value fits in a word on its own.
+If it does there is nothing else to allocate, so both sides have to be the same bits.
+If it does not, each side got its own room on the heap and the addresses differ.
+The lens cell near the top of the notebook says which side of that line each kind falls on.
