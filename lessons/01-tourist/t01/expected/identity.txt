@@ -1,0 +1,5 @@
+built one at a time, then compared     equal   same word
+two small integers                    true    true
+two big integers                      true    false
+two atoms                             true    true
+two lists                             true    false

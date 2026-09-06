@@ -1,0 +1,5 @@
+a name this node has never seen   the table grew by 1
+the same name a second time       the table grew by 0
+
+a three letter atom      0 words
+a two hundred letter atom  0 words

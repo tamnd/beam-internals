@@ -1,0 +1,61 @@
+id = "t01"
+title = "A term is a word"
+part = "01-tourist"
+pass = "tourist"
+
+# A stock release install and Livebook. No emulator build, no root, no checkout
+# of this repository. Every measurement here comes from erts_debug, which ships
+# in the release.
+env = "T0"
+requires = ["otp-29", "livebook"]
+
+duration_minutes = 20
+deps = []
+blueprint = "BP-TERM-001"
+boss = "boss.exs"
+
+claims = [
+  "CLM-TERM-0010",
+  "CLM-TERM-0011",
+  "CLM-TERM-0012",
+  "CLM-TERM-0013",
+]
+
+# The prediction gate. The first one most readers get right, the second one is
+# the one that changes how they think about atoms, and the third is a number
+# almost nobody has.
+predictions = [
+  "A variable holding 42 and a variable holding [1, 2]. Which of them stores something outside itself?",
+  "Does a longer atom name make the variable holding it any bigger?",
+  "Roughly where do integers stop being free?",
+]
+
+[bake]
+# Cells whose output is identical on every machine, so CI can compare them.
+deterministic = [
+  "lens",
+  "names",
+  "ceiling",
+  "identity",
+  "boss",
+]
+
+# Nothing here is run without being compared.
+not_compared = []
+
+# The banner prints the build you are sitting on, and the emulator's build line
+# carries this machine's scheduler counts and whichever optional features it was
+# built with. Erase that and what is left is the release, the erts version and
+# the word size, which is what the lesson is pinned to.
+[bake.normalised]
+banner = ["build-flags"]
+
+[verified]
+# Both architectures, both on the pinned release, both through `just bake`,
+# which runs the cells the way Livebook runs them rather than by somebody
+# reading numbers off a screen.
+"aarch64-darwin" = "OTP 29 erts-17.0.5"
+"x86_64-linux" = "OTP 29 erts-17.0.5"
+on = 2026-09-06
+by = "tamnd"
+how = "just bake t01"

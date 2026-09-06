@@ -251,6 +251,59 @@ verified = 2026-09-02
 by_whom = "tamnd"
 
 [[claim]]
+id = "CLM-TERM-0010"
+text = "Every Erlang term is one machine word, and the word is either the whole value or the address of the rest of it, which is why an integer in range, an atom, a pid and the empty list all cost zero heap words while a float, a list, a tuple, a map and a bitstring do not."
+where = ["t01", "BP-TERM-001#2"]
+evidence = "observed"
+by = [
+  "cell:t01/lens",
+  "erts/emulator/beam/erl_term.h:70-75@OTP-29.0.5",
+  "erts/emulator/beam/erl_term.h:81-84@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-TERM-0011"
+text = "An atom's word holds a position in a table the whole node shares rather than its name, so a name the node has not seen before grows that table by one entry, the same name a second time grows it by none, and a two hundred letter atom costs the same zero words as a three letter one."
+where = ["t01", "BP-TERM-001#2"]
+evidence = "observed"
+by = [
+  "cell:t01/names",
+  "erts/emulator/beam/atom.c:38@OTP-29.0.5",
+  "erts/emulator/beam/atom.h:72@OTP-29.0.5",
+  "erts/emulator/beam/erl_term.h:300@OTP-29.0.5",
+  "erts/emulator/beam/erl_term.h:303@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-TERM-0012"
+text = "An integer stops fitting in its own word between two to the fifty eighth and two to the fifty ninth, so the values that cost no heap span sixty bits of a sixty four bit word, and the four bits missing from the payload are the tag that says what the word is holding."
+where = ["t01", "BP-TERM-001#2"]
+evidence = "observed"
+by = [
+  "cell:t01/ceiling",
+  "erts/emulator/beam/erl_term.h:263@OTP-29.0.5",
+  "erts/emulator/beam/erl_term.h:269-270@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-TERM-0013"
+text = "Two immediates built separately hold the same word and two boxed terms built separately do not, so for an immediate there is no difference between being equal and being the same object, and erts_debug:same/2 is a single comparison of the two words with no walk into either of them."
+where = ["t01", "BP-TERM-001#2"]
+evidence = "observed"
+by = [
+  "cell:t01/identity",
+  "erts/emulator/beam/beam_debug.c:66@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
 id = "CLM-DIST-0001"
 text = "Every term on the external format begins with the version byte 131 followed by one tag byte, and that tag byte alone decides how the rest of the bytes are read."
 where = ["m55", "BP-DIST-001#2"]

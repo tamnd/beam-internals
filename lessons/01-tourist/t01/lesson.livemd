@@ -1,0 +1,331 @@
+# t01 A term is a word
+
+## Before you start
+
+You need an Erlang/OTP 29 install and Livebook. Nothing else. No emulator build, no repository checkout, no root. Everything here runs against the release you already have.
+
+This lesson takes about twenty minutes. It is the first lesson of the tourist pass, so it assumes you can write Elixir or Erlang and assumes nothing at all about the runtime underneath.
+
+Run this first so you know what you are sitting on.
+
+<!-- cell: banner -->
+
+```elixir
+IO.puts(:erlang.system_info(:system_version))
+
+IO.puts("otp release   #{:erlang.system_info(:otp_release)}")
+IO.puts("word size     #{:erlang.system_info(:wordsize) * 8} bit")
+```
+
+```
+Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit] [dtrace]
+
+otp release   29
+word size     64 bit
+```
+
+The word size is the number this whole lesson is about. Everything below assumes 64, and there is a note at the end about what moves if yours said 32.
+
+## The question
+
+Erlang has no type declarations. A variable can hold an integer now and a map later, functions take anything, and a list can have a pid, a binary and a float in it at once.
+
+Something still has to store all of that, and the machine underneath has fixed size registers and fixed size memory words. A 64 bit register holds 64 bits whatever you put in it.
+
+So when you write `x = 42` and then `x = [1, 2]`, what is actually in `x`? Both cannot be the value itself, because a two element list does not fit in a register. And if the machine is holding an address for the list, how does anything later know that the first one was a number and the second one was an address, when both of them are nothing but 64 bits?
+
+## Predict before you run
+
+Write your answers down. Somewhere you will see them again in ten minutes, not in your head.
+
+**One.** A variable holding `42` and a variable holding `[1, 2]`. Is either of them storing something outside itself, and if so which?
+
+**Two.** `:foo` is three letters and `:this_is_a_much_longer_name` is twenty six. Does the longer atom make the variable holding it any bigger?
+
+**Three.** Integers have to stop being free at some point, because 64 bits cannot hold every integer. Say roughly where you think that happens.
+
+Now run things.
+
+## Which variables hold their value
+
+`:erts_debug.flat_size/1` answers one narrow question: how many words of heap does this term occupy, not counting the variable itself. Zero means the whole thing is in the word you are holding. Anything else means the word points somewhere and the count is what is at the other end.
+
+<!-- cell: lens -->
+
+```elixir
+defmodule Lens do
+  def kind(t) when is_integer(t), do: "integer"
+  def kind(t) when is_atom(t), do: "atom"
+  def kind(t) when is_pid(t), do: "pid"
+  def kind(t) when is_float(t), do: "float"
+  def kind(t) when is_list(t), do: "list"
+  def kind(t) when is_tuple(t), do: "tuple"
+  def kind(t) when is_map(t), do: "map"
+  def kind(t) when is_bitstring(t), do: "bitstring"
+end
+
+terms = [
+  {"42", 42},
+  {":foo", :foo},
+  {"self()", self()},
+  {"[]", []},
+  {"3.14", 3.14},
+  {"[1, 2]", [1, 2]},
+  {"{:a, :b}", {:a, :b}},
+  {"%{a: 1}", %{a: 1}},
+  {"<<1, 2, 3>>", <<1, 2, 3>>},
+  {"Bitwise.bsl(1, 59)", Bitwise.bsl(1, 59)}
+]
+
+IO.puts("what you wrote      kind        the variable itself")
+
+for {written, term} <- terms do
+  answer =
+    case :erts_debug.flat_size(term) do
+      0 -> "is the whole value"
+      n -> "is an address, and #{n} words sit at the other end"
+    end
+
+  IO.puts(String.pad_trailing(written, 20) <> String.pad_trailing(Lens.kind(term), 12) <> answer)
+end
+```
+
+```
+what you wrote      kind        the variable itself
+42                  integer     is the whole value
+:foo                atom        is the whole value
+self()              pid         is the whole value
+[]                  list        is the whole value
+3.14                float       is an address, and 2 words sit at the other end
+[1, 2]              list        is an address, and 4 words sit at the other end
+{:a, :b}            tuple       is an address, and 3 words sit at the other end
+%{a: 1}             map         is an address, and 6 words sit at the other end
+<<1, 2, 3>>         bitstring   is an address, and 8 words sit at the other end
+Bitwise.bsl(1, 59)  integer     is an address, and 2 words sit at the other end
+```
+
+Three lines are worth stopping on.
+
+`self()` is a pid, and a pid costs nothing. A process identifier looks like a handle to a big living thing, and the thing it identifies is indeed big, but the identifier itself is a number that fits in a word. So is the empty list, which is why `[]` and `[1, 2]` are on opposite sides of this table while both being lists.
+
+The last line is the same integer type as the first, and it is on the other side. Somewhere between `42` and two to the fifty ninth, an integer stops fitting. Hold that thought for two cells.
+
+The bitstring is the row that would move if you built it another way. Three bytes are three bytes, and eight words is a lot of room for them, because a binary written out inside a cell is stored away from the process heap and those eight words are the reference to it rather than the data. Binaries have more than one representation and the choice between them is made on size and on how the binary was made. `m02` measures all of them, and this lesson takes the eight at face value.
+
+The word for these things is **immediate**. An immediate term is the word. Everything else is **boxed**, meaning the word is an address and the real thing sits on a heap, and the heap here is the process's own, not a shared one.
+
+![Three rows. Each row shows what you wrote on the left and one box in the middle standing for the machine word the variable is. The first row holds 42 with nothing at the other end. The second row holds an index with an arrow into a table of atom names shared by the whole node. The third row holds an address with an arrow to two cells on this process's heap.](files/what-a-variable-holds.svg)
+
+The figure is drawn in Excalidraw and the source is next to it, at `files/what-a-variable-holds.excalidraw`, so you can open it and change it rather than reverse engineering an image.
+
+## The atom that carries no letters
+
+An atom costs zero words, and an atom has a name made of letters that have to be somewhere. Both are true, and this cell is how they fit together.
+
+<!-- cell: names -->
+
+```elixir
+grow = fn name ->
+  before = :erlang.system_info(:atom_count)
+  _ = :erlang.binary_to_atom(name)
+  :erlang.system_info(:atom_count) - before
+end
+
+# The first call also loads whatever this cell needs, and loading a module makes
+# atoms of its own, so the first measurement would be measuring the loader.
+_ = grow.("t01_warm_up")
+
+IO.puts("a name this node has never seen   the table grew by #{grow.("t01_first_sighting")}")
+IO.puts("the same name a second time       the table grew by #{grow.("t01_first_sighting")}")
+
+long = :erlang.binary_to_atom(String.duplicate("x", 200))
+
+IO.puts("")
+IO.puts("a three letter atom      #{:erts_debug.flat_size(:foo)} words")
+IO.puts("a two hundred letter atom  #{:erts_debug.flat_size(long)} words")
+```
+
+```
+a name this node has never seen   the table grew by 1
+the same name a second time       the table grew by 0
+
+a three letter atom      0 words
+a two hundred letter atom  0 words
+```
+
+The letters live in a table, once, for the whole node. Making an atom the node has already seen adds nothing to that table, and the second line is the proof: the same name twice, and the second time the table did not move.
+
+What the word holds is a position in that table. The table is an index table declared at `erts/emulator/beam/atom.c:38@OTP-29.0.5`, the lookup that turns a position back into a name is `erts/emulator/beam/atom.h:72@OTP-29.0.5`, and the two macros that put a position into a word and take it back out are `erts/emulator/beam/erl_term.h:300@OTP-29.0.5` and `erts/emulator/beam/erl_term.h:303@OTP-29.0.5`.
+
+That is why the two hundred letter atom costs the same as the three letter one. The length of the name has nothing to do with the size of the term, because the term never held the name.
+
+It is also why atoms are not garbage collected the way everything else is, and why a program that makes atoms out of user input eventually kills the node. The table only grows. That is a lesson of its own and this is not it, but you have now seen the mechanism that makes it true.
+
+## Where integers stop being free
+
+The table above had a big integer on the boxed side. This finds the edge.
+
+<!-- cell: ceiling -->
+
+```elixir
+import Bitwise
+
+IO.puts("power of two        the integer            words on the heap")
+
+for p <- 57..61 do
+  n = 1 <<< p
+  IO.puts("2^#{p}  #{String.pad_leading(to_string(n), 24)}  #{:erts_debug.flat_size(n)}")
+end
+
+biggest = (1 <<< 59) - 1
+
+IO.puts("")
+IO.puts("2^59 - 1  #{biggest}  #{:erts_debug.flat_size(biggest)}")
+IO.puts("2^59      #{1 <<< 59}  #{:erts_debug.flat_size(1 <<< 59)}")
+IO.puts("-2^59     #{-(1 <<< 59)}  #{:erts_debug.flat_size(-(1 <<< 59))}")
+IO.puts("-2^59 - 1  #{-(1 <<< 59) - 1}  #{:erts_debug.flat_size(-(1 <<< 59) - 1)}")
+```
+
+```
+power of two        the integer            words on the heap
+2^57        144115188075855872  0
+2^58        288230376151711744  0
+2^59        576460752303423488  2
+2^60       1152921504606846976  2
+2^61       2305843009213693952  2
+
+2^59 - 1  576460752303423487  0
+2^59      576460752303423488  2
+-2^59     -576460752303423488  0
+-2^59 - 1  -576460752303423489  2
+```
+
+The free range runs from minus two to the fifty ninth up to two to the fifty ninth minus one. That is two to the sixtieth values, which is sixty bits, on a machine whose word is sixty four bits.
+
+Four bits are missing, and they are missing because they are being used for something. They are the tag: the bits the runtime looks at to find out what kind of thing the word is holding. An integer gets whatever is left over after the tag, which is sixty bits including its sign.
+
+You can read the constant that says so.
+
+<!-- cell: none, the definition the measurement above lands on -->
+
+```
+#define SMALL_BITS	(64-4)
+#define MAX_SMALL	((SWORD_CONSTANT(1) << (SMALL_BITS-1))-1)
+#define MIN_SMALL	(-(SWORD_CONSTANT(1) << (SMALL_BITS-1)))
+```
+
+That is `erts/emulator/beam/erl_term.h:263@OTP-29.0.5` and `erts/emulator/beam/erl_term.h:269-270@OTP-29.0.5`, and the arithmetic in it is the arithmetic you did against the machine a moment ago. The `64-4` is written that way in the source, with the four bits called out, rather than as 60.
+
+An integer that goes past the edge does not fail and does not wrap. It becomes a boxed term, gets a couple of words of heap, and carries on being an integer that arithmetic works on normally. That is the whole cost of leaving the range, and it is why the boundary is easy to be unaware of for years.
+
+## The tag, in one paragraph
+
+Four bits is not the whole story, and the whole story belongs to `m02`. The shape of it is worth having now.
+
+The lowest two bits sort every word into four groups: a header, a pointer to a list cell, a pointer to a boxed term, and an immediate. Those are `erts/emulator/beam/erl_term.h:70-75@OTP-29.0.5`. If the two bits say immediate, the next two bits sort that group again into pids, ports, atoms and integers, at `erts/emulator/beam/erl_term.h:81-84@OTP-29.0.5`, and that is where the four comes from.
+
+Two bits for the common case and more bits only when needed. A pointer keeps sixty two bits of address because it only spent two, and an integer keeps sixty because it spent four.
+
+This is also the first thing you will meet again in this pass. When `t05` shows you the machine code the JIT wrote for a function that adds two numbers, there is an instruction in it that masks a register with fifteen and compares. Fifteen is four bits set. That instruction is the tag test, and you will already know what it is looking for.
+
+## Being equal and being the same
+
+There is one more thing an immediate gives you, and it is the sharpest way to feel the difference.
+
+`:erts_debug.same/2` compares the two words themselves. The whole BIF is one comparison, at `erts/emulator/beam/beam_debug.c:66@OTP-29.0.5`, with no walking into the terms at all. So `true` means the two variables hold the same bits, and for a boxed term that means the same address, which means the same object.
+
+<!-- cell: identity -->
+
+```elixir
+parse = fn text -> String.to_integer(text) end
+atom = fn text -> String.to_atom(text) end
+list = fn -> Enum.to_list(1..2) end
+
+pairs = [
+  {"two small integers", parse.("42"), parse.("42")},
+  {"two big integers", parse.("576460752303423488"), parse.("576460752303423488")},
+  {"two atoms", atom.("t01_same"), atom.("t01_same")},
+  {"two lists", list.(), list.()}
+]
+
+IO.puts("built one at a time, then compared     equal   same word")
+
+for {label, one, two} <- pairs do
+  IO.puts(
+    String.pad_trailing(label, 38) <>
+      String.pad_trailing(to_string(one == two), 8) <> to_string(:erts_debug.same(one, two))
+  )
+end
+```
+
+```
+built one at a time, then compared     equal   same word
+two small integers                    true    true
+two big integers                      true    false
+two atoms                             true    true
+two lists                             true    false
+```
+
+Every pair is equal. Two of them are also the same word, and the two that are are the immediates.
+
+That is not a coincidence and it is not an optimisation. An immediate has nowhere else to be. If two variables hold the small integer 42, they hold the same sixty four bits, because the bits are the number. There is no second copy of 42 anywhere for them to disagree about.
+
+The big integers are equal and are two different objects on the heap, and so are the lists. Copying one of those into another process copies the words. Copying an immediate copies nothing, because there is nothing on the other end to copy, and that is the beginning of an answer to a question `t09` asks properly: what does sending a message actually cost.
+
+## Boss fight
+
+Predict, then check. Predicting after you look does not count and you will know.
+
+Four pairs. Each pair is built the same way twice, one at a time, at run time. For each pair, say whether the two hold the same word.
+
+```
+:ok                and an atom made at run time from the string "ok"
+1000               and 500 + 500, both worked out while the cell runs
+[:ok]              and another [:ok], built one at a time
+self()             and self(), asked twice
+```
+
+The last one is the one to think hardest about.
+
+Load `boss.exs`, which sits next to this notebook, and check yourself. Save the notebook to disk first if you have not, because `__DIR__` is how the cell finds the file and Livebook only knows the directory once the notebook has one.
+
+The cell ships with four `false` answers in it, and they are not all wrong, which is the point. Put your own answers in before you run it.
+
+<!-- cell: boss -->
+
+```elixir
+Code.require_file("boss.exs", __DIR__)
+
+Boss.Grader.check(atom: false, integer: false, list: false, pid: false)
+```
+
+The grader has no answers written into it. It builds each pair on your machine and asks the VM, so it stays right on a 32 bit build and on whatever OTP does next.
+
+## If your word size said 32
+
+The shape holds and one number moves. `SMALL_BITS` is 28 rather than 60, at `erts/emulator/beam/erl_term.h:266@OTP-29.0.5`, so free integers run to a little over 134 million rather than to five hundred quintillion, and code that assumes an integer under a billion costs nothing is allocating on that build.
+
+The tag is still four bits for an immediate and still two for a pointer. It is the payload that shrank, because the word did.
+
+## What this lesson did not explain
+
+It did not explain the header word that sits in front of a boxed term, or the sixteen kinds it can announce. That is `m02` and `m03`.
+
+It did not explain why a list of two costs four words while a tuple of two costs three, which is a real difference with real consequences for the code you write. That is `m02`.
+
+It did not explain why a three byte binary costs three words and a three kilobyte binary costs eight. Binaries have three representations and a threshold between them, and `t09` meets the threshold from the message passing side.
+
+It did not explain what the tags are for. The answer is that the garbage collector walks a heap word by word with no type information other than these bits, and the layout is chosen to make that walk cheap. That is Part 8.
+
+The normative writeup of the term layout, with the full tag table and everything skipped here, is `BP-TERM-001`.
+
+## Claims this lesson makes
+
+Every claim below is in the ledger with the cell that backs it, so you can find out how each one was checked rather than taking it on trust.
+
+| Claim | How it is backed |
+| --- | --- |
+| Every term is one word, and the word is either the value or an address | `CLM-TERM-0010` |
+| An atom's word holds a position in a node wide table, not its name | `CLM-TERM-0011` |
+| Integers stop being free between two to the fifty eighth and two to the fifty ninth, which is four bits of tag | `CLM-TERM-0012` |
+| Two immediates built separately are the same word and two boxed terms are not | `CLM-TERM-0013` |

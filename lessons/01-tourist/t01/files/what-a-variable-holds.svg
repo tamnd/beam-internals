@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="470" viewBox="0 0 1000 470" font-family="Helvetica, Arial, sans-serif">
+<rect width="1000" height="470" fill="#ffffff"/>
+<text x="60" y="56" font-size="20" fill="#1e1e1e">What a variable holds</text>
+<text x="60" y="82" font-size="14" fill="#868e96">Three variables, one word each. One of them is the whole answer. Two are a number saying where to look.</text>
+<text x="60" y="184" font-size="16" fill="#1e1e1e">x = 42</text>
+<rect x="210" y="150" width="210" height="54" rx="6" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<text x="228" y="184" font-size="16" fill="#1971c2">42</text>
+<text x="228" y="224" font-size="13" fill="#868e96">the word is the number</text>
+<text x="60" y="299" font-size="16" fill="#1e1e1e">x = :foo</text>
+<rect x="210" y="265" width="210" height="54" rx="6" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<text x="228" y="299" font-size="16" fill="#e8590c">an index</text>
+<text x="228" y="339" font-size="13" fill="#868e96">the word is a place in a table</text>
+<text x="60" y="414" font-size="16" fill="#1e1e1e">x = [1, 2]</text>
+<rect x="210" y="380" width="210" height="54" rx="6" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<text x="228" y="414" font-size="16" fill="#2f9e44">an address</text>
+<text x="228" y="454" font-size="13" fill="#868e96">the word is a place on a heap</text>
+<text x="450" y="184" font-size="14" fill="#868e96">nothing else exists anywhere</text>
+<line x1="430" y1="292" x2="588" y2="292" stroke="#e8590c" stroke-width="1.4"/>
+<polygon points="588,292 581,287.625 581,296.375" fill="#e8590c"/>
+<rect x="600" y="245" width="300" height="100" rx="6" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<text x="618" y="272" font-size="14" fill="#1e1e1e">'ok'</text>
+<text x="618" y="296" font-size="14" fill="#1e1e1e">'foo'</text>
+<text x="618" y="320" font-size="14" fill="#1e1e1e">'error'</text>
+<text x="760" y="272" font-size="13" fill="#868e96">one row per name</text>
+<text x="760" y="296" font-size="13" fill="#868e96">the node has ever</text>
+<text x="760" y="320" font-size="13" fill="#868e96">seen</text>
+<text x="600" y="366" font-size="13" fill="#868e96">the atom table, one for the whole node</text>
+<line x1="430" y1="407" x2="588" y2="407" stroke="#2f9e44" stroke-width="1.4"/>
+<polygon points="588,407 581,402.625 581,411.375" fill="#2f9e44"/>
+<rect x="600" y="385" width="130" height="44" rx="6" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="770" y="385" width="130" height="44" rx="6" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<text x="618" y="412" font-size="14" fill="#1e1e1e">1  -></text>
+<text x="788" y="412" font-size="14" fill="#1e1e1e">2  ->  []</text>
+<line x1="730" y1="407" x2="762" y2="407" stroke="#2f9e44" stroke-width="1.4"/>
+<polygon points="770,407 763,403 763,411" fill="#2f9e44"/>
+<text x="600" y="452" font-size="13" fill="#868e96">two cells on this process's heap, two words each</text>
+</svg>
