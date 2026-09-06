@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" font-family="Helvetica, Arial, sans-serif">
+<rect width="900" height="430" fill="#ffffff"/>
+<text x="60" y="52" font-size="20" fill="#1e1e1e">Thirty three passes, and what each run of them is working on</text>
+<text x="60" y="78" font-size="14" fill="#868e96">One box per top level pass, in the order they ran. Three of them run sub passes of their own.</text>
+<text x="60" y="136" font-size="15" fill="#1e1e1e">six lines of Erlang</text>
+<line x1="196" y1="131" x2="240" y2="131" stroke="#adb5bd" stroke-width="1.4"/>
+<polygon points="240,131 233,127 233,135" fill="#adb5bd"/>
+<text x="252" y="136" font-size="14" fill="#868e96">234 words of forms</text>
+<line x1="392" y1="131" x2="436" y2="131" stroke="#adb5bd" stroke-width="1.4"/>
+<polygon points="436,131 429,127 429,135" fill="#adb5bd"/>
+<text x="448" y="136" font-size="14" fill="#868e96">1678 words of core erlang</text>
+<line x1="646" y1="131" x2="690" y2="131" stroke="#adb5bd" stroke-width="1.4"/>
+<polygon points="690,131 683,127 683,135" fill="#adb5bd"/>
+<text x="702" y="136" font-size="14" fill="#868e96">139 bytes of code</text>
+<text x="60" y="162" font-size="14" fill="#868e96">It grows more than seven times before it starts coming down.</text>
+<rect x="60" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="84" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="108" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="132" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="156" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="180" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="204" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="228" y="290" width="20" height="34" rx="3" fill="none" stroke="#1971c2" stroke-width="1.4"/>
+<rect x="252" y="290" width="20" height="34" rx="3" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<rect x="276" y="290" width="20" height="34" rx="3" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<rect x="300" y="290" width="20" height="34" rx="3" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<rect x="324" y="290" width="20" height="34" rx="3" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<rect x="348" y="290" width="20" height="34" rx="3" fill="none" stroke="#e8590c" stroke-width="1.4"/>
+<rect x="372" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="396" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="420" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="444" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="468" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="492" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="516" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="540" y="290" width="20" height="34" rx="3" fill="none" stroke="#2f9e44" stroke-width="1.4"/>
+<rect x="564" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="588" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="612" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="636" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="660" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="684" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="708" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="732" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="756" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="780" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="804" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<rect x="828" y="290" width="20" height="34" rx="3" fill="none" stroke="#6741d9" stroke-width="1.4"/>
+<text x="60" y="214" font-size="13" fill="#868e96">sub passes</text>
+<rect x="471" y="256" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<rect x="471" y="246" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<rect x="471" y="236" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<text x="465" y="216" font-size="13" fill="#2f9e44">5</text>
+<rect x="495" y="256" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<rect x="495" y="246" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<rect x="495" y="236" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<text x="489" y="216" font-size="13" fill="#2f9e44">38</text>
+<rect x="543" y="256" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<rect x="543" y="246" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<rect x="543" y="236" width="14" height="6" fill="none" stroke="#2f9e44" stroke-width="1.0"/>
+<text x="537" y="216" font-size="13" fill="#2f9e44">17</text>
+<line x1="60" y1="278" x2="248" y2="278" stroke="#1971c2" stroke-width="1.2"/>
+<text x="60" y="272" font-size="13" fill="#1971c2">forms</text>
+<line x1="252" y1="278" x2="368" y2="278" stroke="#e8590c" stroke-width="1.2"/>
+<text x="252" y="272" font-size="13" fill="#e8590c">core erlang</text>
+<line x1="372" y1="278" x2="560" y2="278" stroke="#2f9e44" stroke-width="1.2"/>
+<text x="372" y="272" font-size="13" fill="#2f9e44">ssa</text>
+<line x1="564" y1="278" x2="848" y2="278" stroke="#6741d9" stroke-width="1.2"/>
+<text x="564" y="272" font-size="13" fill="#6741d9">instructions</text>
+<line x1="598.0" y1="324" x2="598.0" y2="348" stroke="#1e1e1e" stroke-width="1.2"/>
+<line x1="790.0" y1="324" x2="790.0" y2="376" stroke="#1e1e1e" stroke-width="1.2"/>
+<text x="388.0" y="354" font-size="13" fill="#1e1e1e">beam_validator_strong, pass 23</text>
+<text x="585.0" y="382" font-size="13" fill="#1e1e1e">beam_validator_weak, pass 31</text>
+<text x="60" y="420" font-size="14" fill="#868e96">The seven passes between the two checks rewrite the instructions, so the second check tests the rewrite.</text>
+</svg>

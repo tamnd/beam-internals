@@ -1,0 +1,37 @@
+33 top level passes
+3 of them have sub passes, 60 sub passes between them
+93 stages in all, for six lines of Erlang
+
+  1  remove_file
+  2  parse_module
+  3  transform_module
+  4  lint_module
+  5  beam_docs
+  6  remove_doc_attributes
+  7  compile_directives
+  8  expand_records
+  9  core
+ 10  sys_core_fold
+ 11  sys_core_alias
+ 12  core_transforms
+ 13  sys_core_bsm
+ 14  core_to_ssa
+ 15  beam_ssa_bool
+ 16  beam_ssa_share
+ 17  beam_ssa_recv
+ 18  beam_ssa_bsm            5 sub passes
+ 19  beam_ssa_opt            38 sub passes
+ 20  beam_ssa_throw
+ 21  beam_ssa_pre_codegen    17 sub passes
+ 22  beam_ssa_codegen
+ 23  beam_validator_strong
+ 24  beam_a
+ 25  beam_block
+ 26  beam_jump
+ 27  beam_clean
+ 28  beam_trim
+ 29  beam_flatten
+ 30  beam_z
+ 31  beam_validator_weak
+ 32  beam_asm
+ 33  save_binary

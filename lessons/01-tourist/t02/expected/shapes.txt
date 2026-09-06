@@ -1,0 +1,13 @@
+5 forms in, one function or attribute each
+
+forms, straight out of the parser     234 words
+forms, after records were expanded    234 words
+core erlang, first version           1678 words
+core erlang, after folding            971 words
+beam instructions                     536 words
+
+the whole .beam file                  604 bytes
+of which the code chunk               139 bytes
+
+30 top level passes this time, not 33
+missing: remove_file, parse_module, save_binary

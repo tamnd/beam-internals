@@ -1,0 +1,72 @@
+id = "t02"
+title = "The compiler has 93 stages"
+part = "01-tourist"
+pass = "tourist"
+
+# A stock release install and Livebook. The compiler is an ordinary application
+# in that release, so every measurement here is a function call into code the
+# reader already has. No erlc on the path is needed either, which matters for a
+# Livebook that was started from somewhere odd.
+env = "T0"
+requires = ["otp-29", "livebook"]
+
+duration_minutes = 20
+deps = []
+blueprint = "BP-COMP-001"
+boss = "boss.exs"
+
+claims = [
+  "CLM-COMP-0001",
+  "CLM-COMP-0002",
+  "CLM-COMP-0003",
+  "CLM-COMP-0004",
+  "CLM-COMP-0005",
+]
+
+# The prediction gate. Almost nobody is within a factor of three on the first
+# one, the second is the one that changes how people think about the middle of
+# a compiler, and the third is the one experienced readers get wrong by saying
+# once.
+predictions = [
+  "How many named passes run over a six line module? A number, not 'a few'.",
+  "Does the program shrink at every step, or does it grow somewhere first?",
+  "Does the compiler check the code it produced itself, and how many times?",
+]
+
+[bake]
+# Cells whose output is identical on every machine of the same word size, so CI
+# can compare them. The pass counts and the pass names come from the compiler
+# application rather than from the emulator, and the word counts are counts of
+# machine words on a 64 bit build.
+deterministic = [
+  "erlc-time",
+  "validators",
+  "shapes",
+  "catch-me",
+  "boss",
+]
+
+# Nothing here is run without being compared.
+not_compared = []
+
+[bake.normalised]
+# The banner prints the emulator's build line, which carries this machine's
+# scheduler counts and whichever optional features it was built with. Erase that
+# and what is left is the release, the compiler version and the word size, which
+# is what the lesson is pinned to.
+banner = ["build-flags"]
+
+# The module cell prints where it wrote the source, and a temporary directory is
+# different on every machine and on every operating system. The byte count on
+# the same line is not, and that is the part worth comparing.
+module = ["paths"]
+
+[verified]
+# Both architectures, both on the pinned release, both through `just bake`,
+# which runs the cells the way Livebook runs them rather than by somebody
+# reading numbers off a screen.
+"aarch64-darwin" = "OTP 29 erts-17.0.5"
+"x86_64-linux" = "OTP 29 erts-17.0.5"
+on = 2026-09-06
+by = "tamnd"
+how = "just bake t02"
