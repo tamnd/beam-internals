@@ -134,8 +134,70 @@ id = "CLM-COMP-0001"
 text = "Compiling a six line module runs 33 top level passes and 60 sub passes."
 where = ["t02", "BP-COMP-001#3"]
 evidence = "observed"
-by = ["cell:t02/erlc-time"]
-verified = 2026-09-02
+by = [
+  "cell:t02/erlc-time",
+  "lib/compiler/src/compile.erl:1556@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1745@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1871@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-COMP-0002"
+text = "The pass list is chosen before the program is read, so a six line module and a module with records, binary matching, a map lookup, a case and a try run the same 33 top level passes in the same order and the same 60 sub passes, and a pass with nothing to do runs anyway."
+where = ["t02", "BP-COMP-001#3"]
+evidence = "observed"
+by = [
+  "cell:t02/boss",
+  "cell:t02/shapes",
+  "lib/compiler/src/compile.erl:1541-1543@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1550@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1783@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-COMP-0003"
+text = "The compiler validates the instructions it produced twice, once on the direct output of the code generator and again after seven assembly level passes have rewritten them, and the first run is stricter about argument types than the second because merging blocks loses what each call knew on its own."
+where = ["t02", "BP-COMP-001#7"]
+evidence = "observed"
+by = [
+  "cell:t02/validators",
+  "lib/compiler/src/compile.erl:1868@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1898@OTP-29.0.5",
+  "lib/compiler/src/beam_validator.erl:2017-2020@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-COMP-0004"
+text = "Assembly that reads a register nothing ever wrote is rejected by name, with the function, the offset, the instruction and the register in the message, and the run that rejects it is the second validator, because assembly enters the pipeline below the first one."
+where = ["t02", "BP-COMP-001#7"]
+evidence = "observed"
+by = [
+  "cell:t02/catch-me",
+  "lib/compiler/src/compile.erl:1562-1563@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1898@OTP-29.0.5",
+  "lib/compiler/src/beam_validator.erl:2918@OTP-29.0.5",
+]
+verified = 2026-09-06
+by_whom = "tamnd"
+
+[[claim]]
+id = "CLM-COMP-0005"
+text = "A six line module grows from 234 words of abstract forms to 1678 words of Core Erlang, more than seven times, before folding takes it to 971, code generation to 536 words of instructions and the file to 604 bytes of which 139 are code."
+where = ["t02", "BP-COMP-001#4"]
+evidence = "observed"
+by = [
+  "cell:t02/shapes",
+  "lib/compiler/src/compile.erl:1790@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1792@OTP-29.0.5",
+  "lib/compiler/src/compile.erl:1821@OTP-29.0.5",
+]
+verified = 2026-09-06
 by_whom = "tamnd"
 
 [[claim]]

@@ -1,0 +1,11 @@
+l1 ran 33 top level passes and 60 sub passes
+
+top level passes     you said 40      the answer is 33      not this time
+sub passes           you said 75      the answer is 60      not this time
+same list, in order  you said false   the answer is true    not this time
+
+Not all of them.
+The pipeline is a list in compile.erl, chosen before your program is read.
+A pass with nothing to do still runs, and expand_records in the shapes cell is one.
+So the count is the same for both modules, and so is the order.
+What a bigger module changes is how long each pass takes and how much it rewrites.

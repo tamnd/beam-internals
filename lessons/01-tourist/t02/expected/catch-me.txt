@@ -1,0 +1,14 @@
+l1:add/2 is 6 instructions
+  {:label, 1}
+  {:line, [{:location, [], 3}]}
+  {:func_info, {:atom, :l1}, {:atom, :add}, 2}
+  {:label, 2}
+  {:gc_bif, :+, {:f, 0}, 2, [x: 0, x: 1], {:x, 0}}
+  :return
+
+x1 changed to x3, which nothing in this function ever wrote.
+rejected by beam_validator
+function add/2+5:
+  Internal consistency check failed - please report this bug.
+  Instruction: {gc_bif,'+',{f,0},2,[{x,0},{x,3}],{x,0}}
+  Error:       {uninitialized_reg,{x,3}}:

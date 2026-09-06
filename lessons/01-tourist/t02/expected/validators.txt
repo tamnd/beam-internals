@@ -1,0 +1,11 @@
+beam_validator_strong  pass 23 of 33
+beam_validator_weak    pass 31 of 33
+
+between them, 7 passes that rewrite the instructions:
+  beam_a
+  beam_block
+  beam_jump
+  beam_clean
+  beam_trim
+  beam_flatten
+  beam_z

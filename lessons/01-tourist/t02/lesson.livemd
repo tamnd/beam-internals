@@ -1,0 +1,464 @@
+# t02 The compiler has 93 stages
+
+## Before you start
+
+You need an Erlang/OTP 29 install and Livebook. Nothing else. No emulator build, no repository checkout, no root. The compiler is an ordinary Erlang application that ships with the release, so everything here is a function call.
+
+This lesson takes about twenty minutes. It was written and measured against Erlang/OTP 29 erts-17.0.5 on aarch64 and on x86-64, and every number in it is the same on both.
+
+Run this first so you know what you are sitting on.
+
+<!-- cell: banner -->
+
+```elixir
+IO.puts(:erlang.system_info(:system_version))
+
+IO.puts("otp release       #{:erlang.system_info(:otp_release)}")
+IO.puts("compiler version  #{Application.spec(:compiler, :vsn)}")
+IO.puts("word size         #{:erlang.system_info(:wordsize) * 8} bit")
+```
+
+```
+Erlang/OTP 29 [erts-17.0.5] [source] [64-bit] [smp:10:10] [ds:10:10:10] [async-threads:1] [jit] [dtrace]
+
+otp release       29
+compiler version  10.0.3
+word size         64 bit
+```
+
+The compiler version is the one to watch. It moves independently of the release, and it is the thing that decides how many passes you are about to count.
+
+## The question
+
+Six lines of Erlang go in and a `.beam` file comes out. In between, most of us picture a translator. It reads a function, it works out the instructions, it writes them down.
+
+That is not what happens, and the gap between the picture and the machine is larger than almost anywhere else in this book. The compiler does not translate. It rewrites the program over and over, into a different language each time, and each rewrite is a separate pass with a name and a place in a list.
+
+So how many rewrites does six lines of Erlang go through, and what do they leave behind?
+
+## Predict before you run
+
+Write your answers down somewhere you will see them again in five minutes.
+
+**One.** Six lines, three functions, no records and no binaries. How many named passes run over it? Say a number rather than "a few".
+
+**Two.** Does the program shrink at every step on the way to the file, or does it get bigger somewhere first?
+
+**Three.** The compiler produced this code itself, out of its own optimiser. Does it then check the code it wrote a moment ago? If so, how many times?
+
+Now run things.
+
+## The module
+
+This is `l1.erl`, the smallest module in the corpus that still runs the whole pipeline. Three functions, one of them recursive with an accumulator. Nothing here is unusual and that is the point.
+
+<!-- cell: module -->
+
+```elixir
+source = """
+-module(l1).
+-export([add/2, fib/1]).
+add(A, B) -> A + B.
+fib(N) -> fib(N, 0, 1).
+fib(0, A, _) -> A;
+fib(N, A, B) -> fib(N - 1, B, A + B).
+"""
+
+dir = Path.join(System.tmp_dir!(), "t02")
+File.mkdir_p!(dir)
+file = Path.join(dir, "l1.erl")
+File.write!(file, source)
+
+IO.puts(source)
+IO.puts("#{byte_size(source)} bytes, written to #{file}")
+```
+
+```
+-module(l1).
+-export([add/2, fib/1]).
+add(A, B) -> A + B.
+fib(N) -> fib(N, 0, 1).
+fib(0, A, _) -> A;
+fib(N, A, B) -> fib(N - 1, B, A + B).
+
+139 bytes, written to /tmp/t02/l1.erl
+```
+
+The pass tape is read from that file, so the compiler does the reading rather than the notebook.
+
+## The pass tape
+
+`erlc +time` prints one line per pass, and `:compile.file/2` with the `time` option does the same thing from inside a notebook. The output goes to whatever is acting as your output device, so the cell borrows that device for the length of the call and reads back what the compiler said.
+
+The raw output carries a duration and a memory figure per pass, and both of those are properties of your machine on the day. What is not a property of your machine is the list of names, so that is what the cell keeps.
+
+<!-- cell: erlc-time -->
+
+```elixir
+# Take the output device for the length of one call, then hand it back. The
+# compiler writes its timings the same way anything else writes to a console,
+# so this is how you read them without a shell.
+capture = fn fun ->
+  {:ok, device} = StringIO.open("")
+  mine = Process.group_leader()
+  Process.group_leader(self(), device)
+
+  try do
+    fun.()
+  after
+    Process.group_leader(self(), mine)
+  end
+
+  {:ok, {_input, output}} = StringIO.close(device)
+  output
+end
+
+tape =
+  capture.(fn ->
+    :compile.file(String.to_charlist(file), [
+      :time,
+      :report,
+      {:outdir, String.to_charlist(dir)}
+    ])
+  end)
+
+lines = String.split(tape, "\n")
+
+# A top level pass is written at one space of indent, a sub pass at four.
+top = for line <- lines, m = Regex.run(~r/^ (\w+)\s+:\s+\d/, line), do: Enum.at(m, 1)
+
+{_last, sub_counts} =
+  Enum.reduce(lines, {nil, %{}}, fn line, {group, counts} ->
+    cond do
+      m = Regex.run(~r/^\s+%% Sub passes of (\w+)/, line) ->
+        {Enum.at(m, 1), counts}
+
+      Regex.match?(~r/^    \w+\s*:\s+\d/, line) ->
+        {group, Map.update(counts, group, 1, &(&1 + 1))}
+
+      true ->
+        {group, counts}
+    end
+  end)
+
+subs = sub_counts |> Map.values() |> Enum.sum()
+
+IO.puts("#{length(top)} top level passes")
+IO.puts("#{map_size(sub_counts)} of them have sub passes, #{subs} sub passes between them")
+IO.puts("#{length(top) + subs} stages in all, for six lines of Erlang\n")
+
+for {name, n} <- Enum.with_index(top, 1) do
+  row = String.pad_leading("#{n}", 3) <> "  " <> String.pad_trailing(name, 24)
+  extra = Map.get(sub_counts, name)
+  IO.puts(String.trim_trailing(row <> if(extra, do: "#{extra} sub passes", else: "")))
+end
+```
+
+```
+33 top level passes
+3 of them have sub passes, 60 sub passes between them
+93 stages in all, for six lines of Erlang
+
+  1  remove_file
+  2  parse_module
+  3  transform_module
+  4  lint_module
+  5  beam_docs
+  6  remove_doc_attributes
+  7  compile_directives
+  8  expand_records
+  9  core
+ 10  sys_core_fold
+ 11  sys_core_alias
+ 12  core_transforms
+ 13  sys_core_bsm
+ 14  core_to_ssa
+ 15  beam_ssa_bool
+ 16  beam_ssa_share
+ 17  beam_ssa_recv
+ 18  beam_ssa_bsm            5 sub passes
+ 19  beam_ssa_opt            38 sub passes
+ 20  beam_ssa_throw
+ 21  beam_ssa_pre_codegen    17 sub passes
+ 22  beam_ssa_codegen
+ 23  beam_validator_strong
+ 24  beam_a
+ 25  beam_block
+ 26  beam_jump
+ 27  beam_clean
+ 28  beam_trim
+ 29  beam_flatten
+ 30  beam_z
+ 31  beam_validator_weak
+ 32  beam_asm
+ 33  save_binary
+```
+
+Ninety three named stages for six lines. Nobody guesses that number.
+
+Read the list from the top and you can see the program changing language four times. Passes one to eight work on the abstract forms the parser produced, which are Erlang with the syntax removed. Pass nine turns those into Core Erlang, a smaller language with no records, no operators and no shortcuts, and passes ten to thirteen work there. Pass fourteen converts to SSA, where every variable is written once and never again, and eleven passes work there. Pass twenty two generates BEAM instructions, and everything after that is working on instructions.
+
+The three passes with sub passes are the optimisers, and they are where the compiler spends its effort. `beam_ssa_opt` alone runs thirty eight named sub passes over a program that fits on a postcard.
+
+![A strip of thirty three boxes in a row, one per pass, in the order they ran. The strip is divided into four labelled runs: forms, core erlang, ssa and instructions. Three of the boxes carry a small stack above them, labelled five, thirty eight and seventeen. Two of the boxes have a line dropping from them to the labels beam_validator_strong, pass 23 and beam_validator_weak, pass 31.](files/the-pass-tape.svg)
+
+One thing the raw `erlc +time` output will mislead you about. The sub passes are printed slowest first rather than in the order they ran, and the header line above them says so. The cell above counts them rather than listing them, because a list that reorders itself between runs is not something a lesson can hold you to.
+
+## Two of them are the compiler checking itself
+
+Passes twenty three and thirty one have the same job. Both of them are the compiler reading the instructions it produced a moment earlier and asking whether they make sense.
+
+<!-- cell: validators -->
+
+```elixir
+strong = Enum.find_index(top, &(&1 == "beam_validator_strong")) + 1
+weak = Enum.find_index(top, &(&1 == "beam_validator_weak")) + 1
+between = Enum.slice(top, strong, weak - strong - 1)
+
+IO.puts("beam_validator_strong  pass #{strong} of #{length(top)}")
+IO.puts("beam_validator_weak    pass #{weak} of #{length(top)}")
+IO.puts("\nbetween them, #{length(between)} passes that rewrite the instructions:")
+
+for name <- between, do: IO.puts("  #{name}")
+```
+
+```
+beam_validator_strong  pass 23 of 33
+beam_validator_weak    pass 31 of 33
+
+between them, 7 passes that rewrite the instructions:
+  beam_a
+  beam_block
+  beam_jump
+  beam_clean
+  beam_trim
+  beam_flatten
+  beam_z
+```
+
+The first check runs the moment the instructions exist, on the direct output of the code generator. Then seven passes rearrange them: `beam_jump` removes jumps to jumps, `beam_trim` shrinks stack frames, `beam_flatten` takes the blocks apart. Every one of those is a rewrite that could get it wrong, and none of them has the SSA form to fall back on any more.
+
+So the compiler checks again on the way out. Not the same check, either. The first run is stricter about argument types than the second, and the compiler's own source says why: after optimisation, two calls that used to be separate can be merged into one block, and what the merged block knows about its arguments is weaker than what either call knew on its own. Demanding the strong version there would reject correct code, so the second run tolerates arguments that are not in direct conflict, and the first run does the strict work while the information is still sharp.
+
+## It gets bigger before it gets smaller
+
+Six lines of source, and the file that comes out is a few hundred bytes. What happens to the size in between?
+
+The compiler will stop at any point in the pipeline and hand you the program in whatever form it has reached, and `:erts_debug.flat_size/1` from `t01` will tell you how many words that form takes. Two tools that were not built for each other, pointed at the same thing.
+
+This cell parses the source into forms itself rather than handing over a filename, for a reason that shows up at the end of it.
+
+<!-- cell: shapes -->
+
+```elixir
+{:ok, tokens, _end} = :erl_scan.string(String.to_charlist(source))
+
+forms =
+  tokens
+  |> Enum.chunk_by(&(elem(&1, 0) == :dot))
+  |> Enum.reject(&(hd(&1) |> elem(0) == :dot))
+  |> Enum.map(fn one ->
+    {:ok, form} = :erl_parse.parse_form(one ++ [{:dot, 1}])
+    form
+  end)
+
+stops = [
+  {:to_abstr, "forms, straight out of the parser"},
+  {:to_exp, "forms, after records were expanded"},
+  {:to_core0, "core erlang, first version"},
+  {:to_core, "core erlang, after folding"},
+  {:to_asm, "beam instructions"}
+]
+
+IO.puts("#{length(forms)} forms in, one function or attribute each\n")
+
+for {stop, label} <- stops do
+  {:ok, _module, form} = :compile.forms(forms, [stop, :binary])
+  IO.puts(String.pad_trailing(label, 36) <> String.pad_leading("#{:erts_debug.flat_size(form)}", 5) <> " words")
+end
+
+{:ok, _module, binary} = :compile.forms(forms, [:binary])
+{:ok, {:l1, [{~c"Code", code}]}} = :beam_lib.chunks(binary, [~c"Code"])
+
+IO.puts("")
+IO.puts(String.pad_trailing("the whole .beam file", 36) <> String.pad_leading("#{byte_size(binary)}", 5) <> " bytes")
+IO.puts(String.pad_trailing("of which the code chunk", 36) <> String.pad_leading("#{byte_size(code)}", 5) <> " bytes")
+
+from_forms =
+  capture.(fn -> :compile.forms(forms, [:time, :report, :binary]) end)
+  |> String.split("\n")
+  |> Enum.flat_map(fn line ->
+    case Regex.run(~r/^ (\w+)\s+:\s+\d/, line) do
+      nil -> []
+      m -> [Enum.at(m, 1)]
+    end
+  end)
+
+IO.puts("\n#{length(from_forms)} top level passes this time, not #{length(top)}")
+IO.puts("missing: #{Enum.join(top -- from_forms, ", ")}")
+```
+
+```
+5 forms in, one function or attribute each
+
+forms, straight out of the parser     234 words
+forms, after records were expanded    234 words
+core erlang, first version           1678 words
+core erlang, after folding            971 words
+beam instructions                     536 words
+
+the whole .beam file                  604 bytes
+of which the code chunk               139 bytes
+
+30 top level passes this time, not 33
+missing: remove_file, parse_module, save_binary
+```
+
+Two hundred and thirty four words go in and the first Core Erlang version is one thousand six hundred and seventy eight, more than seven times larger. That is not waste. Core Erlang has no operators, no records, no clause heads with patterns in them and no implicit anything, so everything the source left unsaid has to be written out before it can be optimised. Only then does it start coming down: folding takes it to nine hundred and seventy one, the instructions are five hundred and thirty six words, and the code chunk that ends up in the file is one hundred and thirty nine bytes.
+
+The source of this module is also one hundred and thirty nine bytes, which the module cell printed further up. That is a coincidence rather than a rule, and it is worth saying out loud before somebody builds a theory on it.
+
+The second row is a pass that did nothing at all. There are no records in this module, so `expand_records` had nothing to expand, and the form on the way out is the same size as the form on the way in. A pipeline of ninety three fixed stages runs every stage on everything, and a good number of them are looking for something that is not there.
+
+The last two lines are the reason this cell parsed the source itself. Compile from forms already in memory and three of the thirty three passes are gone: `remove_file` deletes the old output, `parse_module` reads the source off the disk, `save_binary` writes the new output. Three of the thirty three passes are not about the program at all, they are about files.
+
+## What the second check is for
+
+Here is the whole of `add/2` as instructions, which is what `t03` spends a lesson reading properly.
+
+The cell then does something a compiler bug would do. It takes one instruction and changes one register, from a register that was set to a register that nothing ever wrote, and feeds the assembly back in. Nothing about this is invalid as a data structure. It is a perfectly well formed instruction, and it is nonsense.
+
+<!-- cell: catch-me -->
+
+```elixir
+{:ok, _name, assembly} = :compile.forms(forms, [:to_asm, :binary])
+{mod, exports, attributes, anno, functions, labels} = assembly
+
+add = Enum.find(functions, fn {:function, name, arity, _entry, _code} -> {name, arity} == {:add, 2} end)
+{:function, :add, 2, _entry, code} = add
+
+IO.puts("l1:add/2 is #{length(code)} instructions")
+for one <- code, do: IO.puts("  #{inspect(one)}")
+
+broken =
+  Enum.map(functions, fn
+    {:function, :add, 2, entry, body} ->
+      changed =
+        Enum.map(body, fn
+          {:gc_bif, op, fail, live, [{:x, 0}, {:x, 1}], dest} ->
+            {:gc_bif, op, fail, live, [{:x, 0}, {:x, 3}], dest}
+
+          other ->
+            other
+        end)
+
+      {:function, :add, 2, entry, changed}
+
+    other ->
+      other
+  end)
+
+IO.puts("\nx1 changed to x3, which nothing in this function ever wrote.")
+
+case :compile.forms({mod, exports, attributes, anno, broken, labels}, [
+       :from_asm,
+       :binary,
+       :return_errors
+     ]) do
+  {:ok, _mod, _binary} ->
+    IO.puts("accepted, which is not what is supposed to happen")
+
+  {:error, problems, _warnings} ->
+    for {_file, found} <- problems, {_where, reporter, detail} <- found do
+      IO.puts("rejected by #{reporter}")
+      IO.puts(String.trim_trailing(to_string(reporter.format_error(detail))))
+    end
+end
+```
+
+```
+l1:add/2 is 6 instructions
+  {:label, 1}
+  {:line, [{:location, [], 3}]}
+  {:func_info, {:atom, :l1}, {:atom, :add}, 2}
+  {:label, 2}
+  {:gc_bif, :+, {:f, 0}, 2, [x: 0, x: 1], {:x, 0}}
+  :return
+
+x1 changed to x3, which nothing in this function ever wrote.
+rejected by beam_validator
+function add/2+5:
+  Internal consistency check failed - please report this bug.
+  Instruction: {gc_bif,'+',{f,0},2,[{x,0},{x,3}],{x,0}}
+  Error:       {uninitialized_reg,{x,3}}:
+```
+
+It named the function, the offset inside it, the instruction and the register. That message is written for whoever broke the compiler, and it says please report this bug because by the time it prints, the only way it could have happened is a bug in a pass.
+
+Which of the two checks caught it? Compiling from assembly starts the pipeline part way down, so only the passes from `beam_a` onwards run, and the strong validator is above that line. The one that caught this is the second one, pass thirty one, the check on the way out. It is not ceremony. It is the only thing standing between a wrong rewrite in `beam_jump` and a `.beam` file full of instructions that the emulator will happily load and then behave strangely on.
+
+## Boss fight
+
+The module below is not six lines. It has records, binary matching, a map lookup, a case and a try. By any reasonable measure it is a harder program than `l1`.
+
+```
+-module(big).
+-export([f/1, g/2, h/1]).
+-record(r, {a, b = 0}).
+f(<<X:8, Rest/binary>>) -> [X | f(Rest)];
+f(<<>>) -> [].
+g(K, M) -> case maps:find(K, M) of {ok, V} -> V; error -> #r{a = K} end.
+h(#r{a = A, b = B}) -> try A + B catch _:_ -> 0 end.
+```
+
+Three questions, and the grader compiles it in front of you rather than holding any answers.
+
+**One.** How many top level passes does it run?
+
+**Two.** How many sub passes?
+
+**Three.** Is the list of pass names, in order, the same list `l1` produced?
+
+Load `boss.exs`, which sits next to this notebook, and check yourself. Save the notebook to disk first if you have not, because `__DIR__` is how the cell finds the file and Livebook only knows the directory once the notebook has one.
+
+The cell ships with three answers already in it and all three are wrong, so put your own in before you run it.
+
+<!-- cell: boss -->
+
+```elixir
+Code.require_file("boss.exs", __DIR__)
+
+Boss.Grader.check(top: 40, sub: 75, same_order: false)
+```
+
+The grader holds no answers. It writes `big.erl` to a temporary directory, compiles it in front of you with the same `time` option this lesson has been using, and compares what it counted against what you said.
+
+The pipeline is a fixed list. A three line module and a three thousand line module go through the same ninety three stages, and the difference between them is how long each stage takes and how much it changes, not how many of them there are.
+
+## If your numbers came out different
+
+The pass count belongs to the compiler application rather than to the release, so the first thing to check is the compiler version the banner printed. A different compiler version is a different list, and the list moves in every release.
+
+The word counts in the shapes cell are counts of machine words, so a 32 bit build gives different figures for the same forms. Everything in this lesson was measured on 64 bit.
+
+If the pass count is right but the sub pass count is not, something turned an optimiser off. `+no_postopt`, `+no_copt` and friends all remove passes from the list, and a build tool that sets one of them for you is the usual reason.
+
+## What this lesson did not explain
+
+What the instructions mean. `t03` reads the assembly line by line, including the annotation where the compiler writes down what it proved about a variable.
+
+What is in the file besides the code. The code chunk was one hundred and thirty nine bytes of six hundred and eight, and `t04` accounts for the rest of them chunk by chunk.
+
+What the machine actually runs. The instructions in this lesson are not what the CPU executes. `t05` is where the JIT turns them into machine code you can read.
+
+Why Core Erlang exists in the shape it does, and what SSA buys the optimiser. Those are Part 4, where the same pipeline gets read from the compiler source rather than from the outside.
+
+## Claims this lesson makes
+
+- `CLM-COMP-0001` Compiling a six line module runs 33 top level passes and 60 sub passes.
+- `CLM-COMP-0002` The pass list does not depend on the program: a six line module and one with records, binaries, maps and a try run the same 33 passes in the same order.
+- `CLM-COMP-0003` The compiler validates its own output twice, once on the direct output of the code generator and again after seven passes have rewritten it.
+- `CLM-COMP-0004` Assembly that reads a register nothing wrote is rejected by name at the second validator, which is the only one that runs when the input is assembly.
+- `CLM-COMP-0005` The program grows more than seven times between the parser and the first Core Erlang version, then shrinks the rest of the way.
+
+Every one of them is in `blueprints/ledger.toml` with the cell that observed it and the lines of the OTP tree it was checked against.

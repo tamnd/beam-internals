@@ -67,6 +67,7 @@ nav:
   - Blueprint notation: notation.md
   - Lessons:
       - t01: lessons/t01/index.md
+      - t02: lessons/t02/index.md
       - t07: lessons/t07/index.md
       - m02: lessons/m02/index.md
       - m55: lessons/m55/index.md
